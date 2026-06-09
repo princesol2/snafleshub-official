@@ -1,0 +1,25 @@
+export const wizardStorageKey = "snafleshub-store-wizard";
+
+export const defaultWizardValues = {
+  ownerName: "",
+  name: "",
+  category: "",
+  showOnMap: true,
+  showContact: true,
+  landmark: "",
+  address: "",
+  lat: "",
+  lng: "",
+  logoFileName: "",
+  coverFileName: "",
+  coverImageUrl: "",
+  logoUrl: "",
+  description: "",
+  workingHours: "",
+  workPhone: "",
+  email: "",
+  password: "",
+  upiId: "",
+  paypalEmail: "",
+  paymentType: "cash",
+};

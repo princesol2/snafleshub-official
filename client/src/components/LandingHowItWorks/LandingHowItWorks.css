@@ -1,0 +1,124 @@
+.landing-how-it-works {
+  width: 100%;
+  padding: clamp(34px, 7vw, 86px) 0 clamp(48px, 7vw, 96px);
+  scroll-margin-top: 108px;
+}
+
+.landing-how-it-works__shell {
+  padding: 0 clamp(8px, 1.2vw, 18px);
+}
+
+.landing-how-it-works__title {
+  margin: 0;
+  text-align: center;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: clamp(2.1rem, 4vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--color-ink);
+}
+
+.landing-how-it-works__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 2.5vw, 32px);
+  margin-top: clamp(28px, 4vw, 42px);
+}
+
+.how-it-works-card {
+  min-height: 100%;
+  padding: 28px 26px 30px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(77, 62, 56, 0.1);
+  box-shadow: 0 18px 40px rgba(49, 38, 33, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  animation: how-it-works-fade-up 620ms ease both;
+}
+
+.how-it-works-card__icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--color-blue-soft);
+  border: 1px solid rgba(27, 166, 178, 0.16);
+  color: var(--color-blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.how-it-works-card__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.how-it-works-card__title {
+  margin: 22px 0 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: clamp(1.35rem, 1.8vw, 1.8rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #1f2430;
+}
+
+.how-it-works-card__description {
+  margin: 16px 0 0;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: #5a5d69;
+}
+
+@keyframes how-it-works-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .how-it-works-card {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .landing-how-it-works__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .landing-how-it-works__shell {
+    padding-inline: 0;
+  }
+
+  .landing-how-it-works__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .how-it-works-card {
+    padding: 24px 22px 26px;
+    border-radius: 22px;
+  }
+
+  .how-it-works-card__title {
+    margin-top: 18px;
+    font-size: 1.5rem;
+  }
+
+  .how-it-works-card__description {
+    margin-top: 14px;
+    font-size: 0.98rem;
+  }
+}

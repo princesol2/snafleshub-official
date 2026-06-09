@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+
+# Environment files
+.env
+*.local
+
+# Logs
+*.log
+*.out.log
+*.err.log
+
+# Local browser/debug profiles and QA screenshots
+.local-mongo/
+audit-report/
+deploy/
+recordings/
+codex-demo-session.json
+client/.edge-*/
+client/screenshots/
+client/audit-shots*/
+client/flow-audit/
+flow-audit/
+walkthrough-shots/
+*-screenshot*.png
+audit-*.png
+codex-*.png
+map-*.png
+landing-hero-*.png
+storefront-*.png
+create-store-*.png
+snafleshub-visual-walkthrough.png
+how-it-works-*.png
