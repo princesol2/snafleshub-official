@@ -2,7 +2,7 @@ import axios from "axios";
 import { getAuthToken } from "./session";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL || "",
   timeout: 12000,
 });
 

@@ -84,6 +84,23 @@ const storeSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    socialLinks: {
+      instagram: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      facebook: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      linkedin: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+    },
     planId: {
       type: String,
       enum: ["free", "founding", "growth"],

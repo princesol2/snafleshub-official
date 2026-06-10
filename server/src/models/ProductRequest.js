@@ -15,8 +15,8 @@ const productRequestSchema = new mongoose.Schema(
     },
     productName: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
     productPrice: {
       type: Number,
@@ -32,10 +32,26 @@ const productRequestSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    customerEmail: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     message: {
       type: String,
       trim: true,
       default: "",
+    },
+    requestType: {
+      type: String,
+      enum: ["product", "message"],
+      default: "product",
+    },
+    customerKey: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
     },
     paymentTiming: {
       type: String,

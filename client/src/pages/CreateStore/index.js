@@ -10,7 +10,7 @@ import { isValidPassword, isValidPhone } from "../../utils/validation";
 import { defaultWizardValues, wizardStorageKey } from "./wizardConfig";
 import "./CreateStore.css";
 
-const categoryOptions = ["Fashion", "Food", "Electronics", "Art", "Services", "Other"];
+const categoryOptions = ["Grocery", "Food", "Fashion", "Electronics", "Handcrafts", "Drawings", "Paintings", "Art", "Services", "Other"];
 
 const stepLabels = ["Welcome", "Vendor", "Store", "Location", "Media", "Contact", "Review", "Done"];
 

@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 const Store = require("../models/Store");
 const Product = require("../models/Product");
 const User = require("../models/User");
@@ -35,6 +37,12 @@ const getProductKeywords = (value) => {
   return [...new Set(value.map((product) => String(product).trim()).filter(Boolean))].slice(0, 12);
 };
 
+const getSocialLinks = (value) => ({
+  instagram: String(value?.instagram || "").trim().slice(0, 220),
+  facebook: String(value?.facebook || "").trim().slice(0, 220),
+  linkedin: String(value?.linkedin || "").trim().slice(0, 220),
+});
+
 const normalizeComparable = (value) => String(value || "").trim();
 
 const getExistingStoreByName = (name) => {
@@ -45,6 +53,30 @@ const getExistingStoreByName = (name) => {
   }
 
   return Store.findOne({ name: new RegExp(`^${escapeRegex(normalizedName)}$`, "i") });
+};
+
+const getStoreCodePrefix = (category, name) => {
+  const source = String(category || name || "STORE")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "")
+    .slice(0, 6);
+
+  return source || "STORE";
+};
+
+const generateUniqueStoreCode = async (category, name) => {
+  const prefix = getStoreCodePrefix(category, name);
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = `SH-${prefix}-${crypto.randomInt(10000, 100000)}`;
+    const existingStore = await Store.findOne({ storeCode: code });
+
+    if (!existingStore) {
+      return code;
+    }
+  }
+
+  return `SH-${prefix}-${Date.now().toString().slice(-6)}`;
 };
 
 const ownsStore = (store, user) => String(store.vendorId?._id || store.vendorId) === String(user?._id);
@@ -75,6 +107,7 @@ const createStore = asyncHandler(async (req, res) => {
     paypalEmail,
     planId = "free",
     location,
+    socialLinks,
   } = req.body;
   const vendorId = req.user._id;
 
@@ -113,6 +146,7 @@ const createStore = asyncHandler(async (req, res) => {
 
   const store = await Store.create({
     vendorId,
+    storeCode: await generateUniqueStoreCode(category, name),
     ownerName,
     name,
     email,
@@ -127,6 +161,7 @@ const createStore = asyncHandler(async (req, res) => {
     upiId,
     paymentType,
     paypalEmail,
+    socialLinks: getSocialLinks(socialLinks),
     planId: "free",
     planStatus: "active",
     showOnMap: Boolean(mapLocation),
@@ -265,6 +300,10 @@ const updateStore = asyncHandler(async (req, res) => {
 
   if (req.body.productKeywords !== undefined) {
     store.productKeywords = getProductKeywords(req.body.productKeywords);
+  }
+
+  if (req.body.socialLinks !== undefined) {
+    store.socialLinks = getSocialLinks(req.body.socialLinks);
   }
 
   if (req.body.location !== undefined) {

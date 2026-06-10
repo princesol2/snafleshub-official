@@ -102,6 +102,7 @@ const generateUniqueStoreCode = async (category, name) => {
 
 const findStoreByLoginId = (storeId) => {
   const normalizedStoreId = String(storeId || "").trim();
+  const phoneDigits = normalizedStoreId.replace(/\D/g, "");
 
   if (!normalizedStoreId) {
     return null;
@@ -113,8 +114,25 @@ const findStoreByLoginId = (storeId) => {
     });
   }
 
-  return Store.findOne({ storeCode: normalizedStoreId.toUpperCase() });
+  return Store.findOne({
+    $or: [
+      { storeCode: normalizedStoreId.toUpperCase() },
+      ...(phoneDigits.length >= 10 ? [{ workPhone: phoneDigits }, { workPhone: normalizedStoreId }] : []),
+    ],
+  });
 };
+
+const findStoreByPhone = (phone) => {
+  const phoneDigits = String(phone || "").replace(/\D/g, "");
+
+  if (!phoneDigits) {
+    return null;
+  }
+
+  return Store.findOne({ $or: [{ workPhone: phoneDigits }, { workPhone: String(phone || "").trim() }] });
+};
+
+const samePhone = (first, second) => String(first || "").replace(/\D/g, "") === String(second || "").replace(/\D/g, "");
 
 const isValidPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -158,18 +176,14 @@ const sendOtp = asyncHandler(async (req, res) => {
 const requestPasswordReset = asyncHandler(async (req, res) => {
   const { storeId, phone } = req.body;
 
-  if (!storeId) {
-    return res.status(400).json({ success: false, message: "Please enter your valid Store ID" });
-  }
-
   if (!isValidPhone(phone)) {
     return res.status(400).json({ success: false, message: "Please enter a valid mobile number" });
   }
 
-  const store = await findStoreByLoginId(storeId);
+  const store = storeId ? await findStoreByLoginId(storeId) : await findStoreByPhone(phone);
 
-  if (!store || String(store.workPhone) !== String(phone)) {
-    return res.status(404).json({ success: false, message: "No store found for this Store ID and phone number" });
+  if (!store || !samePhone(store.workPhone, phone)) {
+    return res.status(404).json({ success: false, message: "No store found for this phone number" });
   }
 
   const verificationCode = generateVerificationCode();
@@ -180,10 +194,6 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
 
 const resetPassword = asyncHandler(async (req, res) => {
   const { storeId, phone, otp, password } = req.body;
-
-  if (!storeId) {
-    return res.status(400).json({ success: false, message: "Please enter your valid Store ID" });
-  }
 
   if (!isValidPhone(phone)) {
     return res.status(400).json({ success: false, message: "Please enter a valid mobile number" });
@@ -203,10 +213,10 @@ const resetPassword = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: "Invalid reset code" });
   }
 
-  const store = await findStoreByLoginId(storeId);
+  const store = storeId ? await findStoreByLoginId(storeId) : await findStoreByPhone(phone);
 
-  if (!store || String(store.workPhone) !== String(phone)) {
-    return res.status(404).json({ success: false, message: "No store found for this Store ID and phone number" });
+  if (!store || !samePhone(store.workPhone, phone)) {
+    return res.status(404).json({ success: false, message: "No store found for this phone number" });
   }
 
   const user = await User.findById(store.vendorId);
@@ -275,6 +285,7 @@ const registerVendorStore = asyncHandler(async (req, res) => {
     paypalEmail,
     planId = "free",
     location,
+    socialLinks,
   } = req.body;
 
   if (!ownerName) {
@@ -426,6 +437,11 @@ const registerVendorStore = asyncHandler(async (req, res) => {
     upiId,
     paymentType,
     paypalEmail,
+    socialLinks: {
+      instagram: String(socialLinks?.instagram || "").trim().slice(0, 220),
+      facebook: String(socialLinks?.facebook || "").trim().slice(0, 220),
+      linkedin: String(socialLinks?.linkedin || "").trim().slice(0, 220),
+    },
     planId: "free",
     planStatus: "active",
     showOnMap: Boolean(mapLocation),
@@ -450,7 +466,7 @@ const loginWithStoreId = asyncHandler(async (req, res) => {
   const { storeId, password } = req.body;
 
   if (!storeId) {
-    return res.status(400).json({ success: false, message: "Please enter your valid Store ID" });
+    return res.status(400).json({ success: false, message: "Please enter your Store ID or work phone number" });
   }
 
   if (!isValidPassword(password)) {
@@ -466,7 +482,7 @@ const loginWithStoreId = asyncHandler(async (req, res) => {
   const user = await User.findById(store.vendorId);
 
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ success: false, message: "Invalid store ID or password" });
+    return res.status(401).json({ success: false, message: "Invalid Store ID, phone number, or password" });
   }
 
   const userObject = user.toObject();

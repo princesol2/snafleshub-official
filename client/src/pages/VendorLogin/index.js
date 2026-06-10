@@ -76,7 +76,7 @@ function VendorLogin() {
     resetStatus();
 
     if (!storeId.trim()) {
-      setError(getFormAlert(t("validation.storeId")));
+      setError(getFormAlert("Please enter your Store ID or work phone number."));
       return;
     }
 
@@ -110,11 +110,6 @@ function VendorLogin() {
   const handleRequestPasswordReset = async (event) => {
     event.preventDefault();
     resetStatus();
-
-    if (!resetStoreId.trim()) {
-      setError(getFormAlert(t("validation.storeId")));
-      return;
-    }
 
     if (!isValidPhone(resetPhone)) {
       setError(getFormAlert(t("validation.phone")));
@@ -162,7 +157,7 @@ function VendorLogin() {
       });
       setMessage(response.data.message || t("login.passwordUpdated"));
       setPassword("");
-      setStoreId(resetStoreId);
+      setStoreId(resetStoreId || resetPhone);
       setActiveMode(authModes.store);
     } catch (requestError) {
       setError(normalizeApiError(requestError, { title: "Password could not be updated", message: t("login.passwordResetError") }));
@@ -226,10 +221,10 @@ function VendorLogin() {
                   <p>Access your SnaflesHub store dashboard</p>
                 </div>
                 <label className="vendor-login-field">
-                  <span>{t("login.storeId")}</span>
+                  <span>Store ID or work phone</span>
                   <input
                     type="text"
-                    placeholder={t("login.storeIdPlaceholder")}
+                    placeholder="Enter Store ID or work phone"
                     value={storeId}
                     onChange={(event) => setStoreId(event.target.value)}
                     required
@@ -260,7 +255,7 @@ function VendorLogin() {
                   {isOtpEnabled ? (
                     <>
                       <button type="button" className="vendor-login-link" onClick={handleForgotPassword}>
-                        {t("login.forgot")}
+                        Forgot Store ID or password?
                       </button>
                       <button type="button" className="vendor-login-link" onClick={() => switchAuthMode(authModes.otp)}>
                         {t("login.withOtp")}
@@ -268,7 +263,7 @@ function VendorLogin() {
                     </>
                   ) : (
                     <button type="button" className="vendor-login-link" onClick={handleForgotPassword}>
-                      {t("login.forgot")}
+                      Forgot Store ID or password?
                     </button>
                   )}
                 </div>
@@ -306,7 +301,7 @@ function VendorLogin() {
                   {isSubmitting ? t("login.sendingOtp") : t("login.sendOtp")}
                 </button>
                 <button type="button" className="vendor-login-alt" onClick={() => switchAuthMode(authModes.store)}>
-                  {t("login.useStoreId")}
+                  Use Store ID or phone
                 </button>
               </form>
             ) : (
@@ -317,16 +312,15 @@ function VendorLogin() {
               >
                 <div className="vendor-login-form__header">
                   <h1 className="vendor-login-title">{t("login.resetPassword")}</h1>
-                  <p>{t("login.resetHint")}</p>
+                  <p>Use your work phone to receive a reset code. Store ID is optional if you remember it.</p>
                 </div>
                 <label className="vendor-login-field">
-                  <span>{t("login.storeId")}</span>
+                  <span>Store ID optional</span>
                   <input
                     type="text"
-                    placeholder={t("login.storeIdPlaceholder")}
+                    placeholder="Enter Store ID if you remember it"
                     value={resetStoreId}
                     onChange={(event) => setResetStoreId(event.target.value)}
-                    required
                   />
                 </label>
                 <label className="vendor-login-field">
@@ -384,7 +378,7 @@ function VendorLogin() {
                       : t("login.sendResetCode")}
                 </button>
                 <button type="button" className="vendor-login-alt" onClick={() => switchAuthMode(authModes.store)}>
-                  {t("login.useStoreId")}
+                  Use Store ID or phone
                 </button>
               </form>
             )}

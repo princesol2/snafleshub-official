@@ -8,6 +8,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import {
   getStoreId,
+  getStoreCode,
   getStoreInitials,
   getStoreLink,
   getStoreLocationLabel,
@@ -219,7 +220,7 @@ function ProductPreview({ products, isLoading, store, storeIndex }) {
           <span>{product.name}</span>
           {product.price !== undefined ? <strong>{`${t("store.productPrice")}: ${product.price}`}</strong> : null}
           <Link to={`${getStoreLink(store, storeIndex)}#products`}>
-            {t("map.viewItem")}
+            Pull in
           </Link>
         </article>
       ))}
@@ -249,6 +250,7 @@ function StoreHoverCard({ store, index, products, isLoadingProducts, onClose }) 
           <span>{getStoreStatusLabel(store, t)}</span>
         </div>
         <h2>{store.name}</h2>
+        <span className="custom-store-card__store-id">Store ID: {getStoreCode(store)}</span>
         <p>{store.description || t("map.defaultDescription")}</p>
         <div className="custom-store-card__details">
           <div>
@@ -318,6 +320,7 @@ function StoreResultsTray({ stores, activeStoreId, query, onSelect }) {
             <span>{getStoreInitials(store)}</span>
             <div>
               <strong>{store.name}</strong>
+              <em>{getStoreCode(store)}</em>
               <small>{getStoreLocationLabel(store)}</small>
             </div>
           </button>

@@ -393,6 +393,7 @@
 }
 
 .custom-map__results-list strong,
+.custom-map__results-list em,
 .custom-map__results-list small {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -402,6 +403,13 @@
 .custom-map__results-list strong {
   color: var(--color-ink);
   font-size: 0.9rem;
+}
+
+.custom-map__results-list em {
+  color: var(--color-blue-deep);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 900;
 }
 
 .custom-map__results-list small {
@@ -561,6 +569,19 @@
   color: var(--color-ink);
   font-size: 1.24rem;
   line-height: 1.08;
+}
+
+.custom-store-card__store-id {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f1f7f8;
+  color: var(--color-blue-deep);
+  font-size: 0.72rem;
+  font-weight: 950;
 }
 
 .custom-store-card p {

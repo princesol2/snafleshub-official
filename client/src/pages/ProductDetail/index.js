@@ -166,7 +166,7 @@ function ProductDetail() {
                 {isOwnStorePreview ? "Preview only" : "Add to cart"}
               </button>
               <button type="button" onClick={() => handleAddToCart(true)} disabled={isUnavailable || isOwnStorePreview}>
-                {isOwnStorePreview ? "Checkout disabled" : "Buy now"}
+                {isOwnStorePreview ? "Checkout disabled" : "Pull in"}
               </button>
             </div>
           </section>

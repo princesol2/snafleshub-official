@@ -5,11 +5,13 @@ import {
   Clock,
   CreditCard,
   MapPin,
+  MessageCircle,
   Minus,
   Package,
   Phone,
   Plus,
   Search,
+  Send,
   ShoppingBag,
   ShoppingCart,
   Trash2,
@@ -18,7 +20,7 @@ import {
 import api from "../../services/api";
 import { useLanguage } from "../../i18n/LanguageContext";
 import useDocumentTitle from "../../utils/useDocumentTitle";
-import { getStoreInitials, getStoreLocationLabel } from "../../utils/storeDisplay";
+import { getStoreCode, getStoreInitials, getStoreLocationLabel } from "../../utils/storeDisplay";
 import { StoreViewSkeleton } from "../../components/LoadingSkeleton";
 import { isValidPhone } from "../../utils/validation";
 import { getVendor } from "../../services/session";
@@ -37,6 +39,10 @@ function getCartStorageKey(storeId) {
   return `snafleshub_cart_${storeId}`;
 }
 
+function SocialBadge({ label }) {
+  return <span className="social-icon-badge" aria-hidden="true">{label}</span>;
+}
+
 function StoreView() {
   const { t } = useLanguage();
   const { id } = useParams();
@@ -51,6 +57,11 @@ function StoreView() {
   const [checkoutError, setCheckoutError] = useState("");
   const [checkoutStatus, setCheckoutStatus] = useState(null);
   const [cartNotice, setCartNotice] = useState("");
+  const [isMessageOpen, setIsMessageOpen] = useState(false);
+  const [messageForm, setMessageForm] = useState({ name: "", phone: "", email: "", message: "" });
+  const [messageError, setMessageError] = useState("");
+  const [messageStatus, setMessageStatus] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -139,12 +150,53 @@ function StoreView() {
   const cartSubtotal = hydratedCart.reduce((sum, item) => sum + Number(item.product.price || 0) * Number(item.quantity || 0), 0);
   const coverImage = store?.coverImageUrl;
   const logoImage = store?.logoUrl;
+  const socialLinks = store?.socialLinks || {};
+  const visibleSocialLinks = [
+    { key: "instagram", label: "Instagram", iconLabel: "IG", href: socialLinks.instagram },
+    { key: "facebook", label: "Facebook", iconLabel: "f", href: socialLinks.facebook },
+    { key: "linkedin", label: "LinkedIn", iconLabel: "in", href: socialLinks.linkedin },
+  ].filter((item) => item.href);
   const vendor = getVendor();
   const isOwnStorePreview = isVendorStoreOwner(store, vendor);
 
   const updateCheckoutForm = (field, value) => {
     setCheckoutForm((current) => ({ ...current, [field]: value }));
     setCheckoutError("");
+  };
+
+  const updateMessageForm = (field, value) => {
+    setMessageForm((current) => ({ ...current, [field]: value }));
+    setMessageError("");
+    setMessageStatus("");
+  };
+
+  const submitVendorMessage = async (event) => {
+    event.preventDefault();
+    setMessageError("");
+    setMessageStatus("");
+
+    if (!messageForm.name.trim() || !isValidPhone(messageForm.phone) || messageForm.message.trim().length < 3) {
+      setMessageError("Enter your name, a valid mobile number, and a short message.");
+      return;
+    }
+
+    try {
+      setIsSendingMessage(true);
+      const response = await api.post(`/api/stores/${store._id}/requests`, {
+        requestType: "message",
+        customerName: messageForm.name.trim(),
+        customerPhone: messageForm.phone.trim(),
+        customerEmail: messageForm.email.trim(),
+        message: messageForm.message.trim(),
+      });
+
+      setMessageStatus(response.data.message || "Message sent to vendor.");
+      setMessageForm({ name: "", phone: "", email: "", message: "" });
+    } catch (requestError) {
+      setMessageError(requestError.response?.data?.message || "Unable to send this message. Please try again.");
+    } finally {
+      setIsSendingMessage(false);
+    }
   };
 
   const addToCart = (product) => {
@@ -271,19 +323,25 @@ function StoreView() {
               <div className="public-store__identity">
                 <p>Local storefront</p>
                 <h1>{store.name}</h1>
-                <span>{store.category || t("store.general")}</span>
+                <span>{store.category || t("store.general")} · Store ID: {getStoreCode(store)}</span>
               </div>
-              <button className="public-store__primary" type="button" onClick={() => {
-                if (isOwnStorePreview) {
-                  setCartNotice("Preview mode: use a customer session to test checkout.");
-                  return;
-                }
+              <div className="public-store__actions">
+                <button className="public-store__secondary" type="button" onClick={() => setIsMessageOpen(true)}>
+                  <MessageCircle size={16} aria-hidden="true" />
+                  Message
+                </button>
+                <button className="public-store__primary" type="button" onClick={() => {
+                  if (isOwnStorePreview) {
+                    setCartNotice("Preview mode: use a customer session to test checkout.");
+                    return;
+                  }
 
-                navigate(`/store/${id}/checkout`);
-              }}>
-                <ShoppingCart size={16} aria-hidden="true" />
-                {isOwnStorePreview ? "Preview mode" : `Cart ${cartCount ? `(${cartCount})` : ""}`}
-              </button>
+                  navigate(`/store/${id}/checkout`);
+                }}>
+                  <ShoppingCart size={16} aria-hidden="true" />
+                  {isOwnStorePreview ? "Preview mode" : `Cart ${cartCount ? `(${cartCount})` : ""}`}
+                </button>
+              </div>
             </div>
           </section>
 
@@ -300,6 +358,10 @@ function StoreView() {
                 <span>
                   <MapPin size={16} aria-hidden="true" />
                   {getStoreLocationLabel(store)}
+                </span>
+                <span>
+                  <Package size={16} aria-hidden="true" />
+                  Store ID: {getStoreCode(store)}
                 </span>
                 {store.workingHours ? (
                   <span>
@@ -324,6 +386,19 @@ function StoreView() {
               <p>Search available products, open item details, add items to cart, and place a manual order.</p>
             </aside>
           </section>
+
+          {visibleSocialLinks.length ? (
+            <section className="public-store__socials" aria-label="Store social links">
+              {visibleSocialLinks.map((social) => {
+                return (
+                  <a key={social.key} href={social.href} target="_blank" rel="noreferrer" aria-label={`${store.name} on ${social.label}`} title={social.label}>
+                    <SocialBadge label={social.iconLabel} />
+                    <span>{social.label}</span>
+                  </a>
+                );
+              })}
+            </section>
+          ) : null}
 
           {cartNotice ? (
             <p className="store-cart-notice" role="status">
@@ -377,20 +452,31 @@ function StoreView() {
                         </div>
                       </div>
                     </button>
-                    <button
-                      className="store-product-card__buy"
-                      type="button"
-                      onClick={() => {
-                        addToCart(product);
-                        if (!isOwnStorePreview) {
-                          navigate(`/store/${id}/checkout`);
-                        }
-                      }}
-                      disabled={product.stock === 0 || isOwnStorePreview}
-                    >
-                      <ShoppingCart size={16} aria-hidden="true" />
-                      {isOwnStorePreview ? "Preview only" : "Add to cart"}
-                    </button>
+                    <div className="store-product-card__actions">
+                      <button
+                        className="store-product-card__pull"
+                        type="button"
+                        onClick={() => {
+                          addToCart(product);
+                          if (!isOwnStorePreview) {
+                            navigate(`/store/${id}/checkout`);
+                          }
+                        }}
+                        disabled={product.stock === 0 || isOwnStorePreview}
+                      >
+                        {isOwnStorePreview ? "Preview only" : "Pull in"}
+                      </button>
+                      <button
+                        className="store-product-card__cart"
+                        type="button"
+                        onClick={() => addToCart(product)}
+                        disabled={product.stock === 0 || isOwnStorePreview}
+                        aria-label={isOwnStorePreview ? "Preview only" : `Add ${product.name} to cart`}
+                        title={isOwnStorePreview ? "Preview only" : "Add to cart"}
+                      >
+                        <ShoppingCart size={16} aria-hidden="true" />
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -414,9 +500,48 @@ function StoreView() {
                   <p>{selectedProduct.stock > 0 ? `${selectedProduct.stock} in stock` : "Out of stock"}</p>
                   <button className="store-request-submit" type="button" onClick={() => addToCart(selectedProduct)} disabled={selectedProduct.stock === 0 || isOwnStorePreview}>
                     <ShoppingCart size={17} aria-hidden="true" />
-                    {isOwnStorePreview ? "Preview only" : "Add to cart"}
+                    {isOwnStorePreview ? "Preview only" : "Pull in"}
                   </button>
                 </div>
+              </section>
+            </div>
+          ) : null}
+
+          {isMessageOpen ? (
+            <div className="store-request-overlay" role="dialog" aria-modal="true" aria-labelledby="vendor-message-title">
+              <section className="store-request-panel">
+                <button className="store-request-panel__close" type="button" onClick={() => setIsMessageOpen(false)} aria-label="Close message form">
+                  <X size={18} aria-hidden="true" />
+                </button>
+                <form className="store-request-form" onSubmit={submitVendorMessage} noValidate>
+                  <div className="store-request-panel__header">
+                    <span>Vendor mailbox</span>
+                    <h2 id="vendor-message-title">Message {store.name}</h2>
+                    <p>Send a note inside SnaflesHub. To protect vendors, customers can send 2 messages per day.</p>
+                  </div>
+                  <label className="store-request-field">
+                    <span>Name</span>
+                    <input value={messageForm.name} onChange={(event) => updateMessageForm("name", event.target.value)} placeholder="Your name" />
+                  </label>
+                  <label className="store-request-field">
+                    <span>Mobile number</span>
+                    <input value={messageForm.phone} onChange={(event) => updateMessageForm("phone", event.target.value)} placeholder="Your mobile number" />
+                  </label>
+                  <label className="store-request-field">
+                    <span>Email optional</span>
+                    <input type="email" value={messageForm.email} onChange={(event) => updateMessageForm("email", event.target.value)} placeholder="name@example.com" />
+                  </label>
+                  <label className="store-request-field">
+                    <span>Message</span>
+                    <textarea value={messageForm.message} onChange={(event) => updateMessageForm("message", event.target.value)} placeholder="Ask about size, timing, availability, or pickup." />
+                  </label>
+                  {messageError ? <p className="store-request-error">{messageError}</p> : null}
+                  {messageStatus ? <p className="store-request-success-note">{messageStatus}</p> : null}
+                  <button className="store-request-submit" type="submit" disabled={isSendingMessage}>
+                    <Send size={17} aria-hidden="true" />
+                    {isSendingMessage ? "Sending..." : "Send message"}
+                  </button>
+                </form>
               </section>
             </div>
           ) : null}

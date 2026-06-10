@@ -6,6 +6,10 @@ export function getStoreLink(store, index = 0) {
   return `/store/${getStoreId(store, index)}`;
 }
 
+export function getStoreCode(store) {
+  return store?.storeCode || getStoreId(store);
+}
+
 export function getStoreLocationLabel(store) {
   if (store?.address) {
     return store.address;

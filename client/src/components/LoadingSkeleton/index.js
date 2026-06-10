@@ -100,7 +100,10 @@ export function StoreViewSkeleton() {
                 <SkeletonBlock className="skeleton-line skeleton-line--lg" />
                 <SkeletonBlock className="skeleton-line skeleton-line--sm" />
               </div>
-              <SkeletonBlock className="store-product-card__buy" />
+              <div className="store-product-card__actions">
+                <SkeletonBlock className="store-product-card__pull" />
+                <SkeletonBlock className="store-product-card__cart" />
+              </div>
             </article>
           ))}
         </div>

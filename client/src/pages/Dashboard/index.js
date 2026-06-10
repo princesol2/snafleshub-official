@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { ChevronDown, Copy, ExternalLink, MessageCircle, PackageCheck, PackagePlus, Phone, QrCode, Search, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Copy, ExternalLink, MessageCircle, PackageCheck, PackagePlus, Phone, QrCode, Search, X } from "lucide-react";
 import api from "../../services/api";
 import Modal from "../../components/Modal";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -23,6 +23,7 @@ const initialProductForm = {
 const dashboardTabs = [
   { id: "products", label: "Products" },
   { id: "orders", label: "Orders" },
+  { id: "messages", label: "Messages" },
   { id: "payments", label: "Payments" },
   { id: "sales", label: "Sales" },
   { id: "favorites", label: "My Favorite Ones" },
@@ -56,6 +57,11 @@ const initialProfileForm = {
   upiId: "",
   lat: "",
   lng: "",
+  socialLinks: {
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+  },
 };
 
 function getPaymentLabel(store) {
@@ -116,6 +122,20 @@ function formatCurrency(value) {
   return `₹${Number(value || 0).toLocaleString("en-IN")}`;
 }
 
+function getPriceSuggestion(value) {
+  const trimmedValue = String(value || "").trim();
+  const price = Number(trimmedValue);
+
+  if (!trimmedValue || !Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return {
+    label: formatCurrency(price),
+    copy: `This product will show as ${formatCurrency(price)} to customers.`,
+  };
+}
+
 function formatOrderStatus(value) {
   return String(value || "confirmed")
     .replace(/_/g, " ")
@@ -124,6 +144,10 @@ function formatOrderStatus(value) {
 
 function getPhoneDigits(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function SocialBadge({ label }) {
+  return <span className="social-icon-badge" aria-hidden="true">{label}</span>;
 }
 
 function Dashboard() {
@@ -138,7 +162,9 @@ function Dashboard() {
   const [productSearch, setProductSearch] = useState("");
   const [productSort, setProductSort] = useState("newest");
   const [orders, setOrders] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [ordersError, setOrdersError] = useState("");
+  const [messagesError, setMessagesError] = useState("");
   const [ordersStatus, setOrdersStatus] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState("");
   const [productForm, setProductForm] = useState(initialProductForm);
@@ -203,6 +229,11 @@ function Dashboard() {
             upiId: currentStore.upiId || "",
             lat: currentStore.location?.lat ?? "",
             lng: currentStore.location?.lng ?? "",
+            socialLinks: {
+              instagram: currentStore.socialLinks?.instagram || "",
+              facebook: currentStore.socialLinks?.facebook || "",
+              linkedin: currentStore.socialLinks?.linkedin || "",
+            },
           });
           const productsResponse = await api.get(`/api/stores/${currentStore._id}/products`);
 
@@ -228,9 +259,27 @@ function Dashboard() {
             setOrders([]);
             setOrdersError("Unable to load customer orders.");
           }
+          try {
+            const messagesResponse = await api.get(`/api/stores/${currentStore._id}/requests`);
+
+            if (!isMounted) {
+              return;
+            }
+
+            setMessages(messagesResponse.data.data || []);
+            setMessagesError("");
+          } catch (requestLoadError) {
+            if (!isMounted) {
+              return;
+            }
+
+            setMessages([]);
+            setMessagesError("Unable to load vendor mailbox.");
+          }
         } else {
           setProducts([]);
           setOrders([]);
+          setMessages([]);
         }
       } catch (requestError) {
         if (!isMounted) {
@@ -309,11 +358,12 @@ function Dashboard() {
   const dashboardStatusTone = "is-live";
   const healthMetrics = [
     { label: "Orders", value: openOrders.length, detail: `${orders.length} total` },
+    { label: "Messages", value: messages.filter((message) => message.requestType === "message").length, detail: "vendor inbox" },
     { label: "Payments", value: formatCurrency(pendingPaymentTotal), detail: `${pendingPaymentOrders.length} pending` },
     { label: "Sales", value: formatCurrency(totalSales), detail: `${completedOrders.length} completed` },
-    { label: "Products", value: products.length, detail: `${lowStockProducts.length} low stock` },
   ];
   const productSearchTerm = productSearch.trim().toLowerCase();
+  const priceSuggestion = getPriceSuggestion(productForm.price);
   const visibleProducts = products
     .filter((product) => {
       if (!productSearchTerm) {
@@ -436,6 +486,7 @@ function Dashboard() {
     }
 
     try {
+      const wasEditingProduct = Boolean(editingProductId);
       setIsAddingProduct(true);
       setProductError("");
       setProductStatus("");
@@ -453,14 +504,14 @@ function Dashboard() {
         : await api.post("/api/products", productPayload);
 
       setProducts((current) =>
-        editingProductId
+        wasEditingProduct
           ? current.map((product) => (product._id === editingProductId ? response.data.data : product))
           : [response.data.data, ...current]
       );
       setProductForm(initialProductForm);
       setEditingProductId("");
-      setIsProductFormOpen(false);
-      setProductStatus(editingProductId ? t("store.updateProductSuccess") : t("store.addProductSuccess"));
+      setIsProductFormOpen(!wasEditingProduct);
+      setProductStatus(wasEditingProduct ? t("store.updateProductSuccess") : t("store.addProductSuccess"));
     } catch (requestError) {
       setProductError(requestError.response?.data?.message || t("store.saveProductError"));
     } finally {
@@ -485,6 +536,18 @@ function Dashboard() {
 
   const updateProfileForm = (field, value) => {
     setProfileForm((current) => ({ ...current, [field]: value }));
+    setProfileError("");
+    setProfileStatus("");
+  };
+
+  const updateSocialForm = (field, value) => {
+    setProfileForm((current) => ({
+      ...current,
+      socialLinks: {
+        ...current.socialLinks,
+        [field]: value,
+      },
+    }));
     setProfileError("");
     setProfileStatus("");
   };
@@ -521,6 +584,11 @@ function Dashboard() {
         paymentType: profileForm.paymentType,
         upiId: profileForm.upiId.trim(),
         location: hasLocation ? { lat, lng } : null,
+        socialLinks: {
+          instagram: profileForm.socialLinks.instagram.trim(),
+          facebook: profileForm.socialLinks.facebook.trim(),
+          linkedin: profileForm.socialLinks.linkedin.trim(),
+        },
       });
 
       setStore(response.data.data);
@@ -570,6 +638,9 @@ function Dashboard() {
             {store ? (
               <div className="vendor-score__header-actions">
                 <Link to={`/store/${store._id}`}>View Store</Link>
+                <button type="button" onClick={() => openDashboardSection("profile")}>
+                  Add my social
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -885,6 +956,54 @@ function Dashboard() {
           </section>
         ) : null}
 
+        {activeTab === "messages" ? (
+          <section className="vendor-score__products vendor-requests-panel" aria-labelledby="dashboard-messages-title">
+            <div className="vendor-profile-panel__header">
+              <div>
+                <h2 id="dashboard-messages-title">Vendor mailbox</h2>
+                <p>Read customer messages sent from the public storefront.</p>
+              </div>
+              <span>{messages.filter((message) => message.requestType === "message").length} messages</span>
+            </div>
+
+            {messagesError ? <p className="status-text status-text--error">{messagesError}</p> : null}
+
+            {messages.filter((message) => message.requestType === "message").length === 0 ? (
+              <div className="dashboard-empty-state">
+                <MessageCircle size={30} aria-hidden="true" />
+                <strong>No vendor messages yet</strong>
+                <p>When customers message this store, their notes will appear here.</p>
+              </div>
+            ) : (
+              <div className="vendor-request-list">
+                {messages.filter((message) => message.requestType === "message").map((message) => (
+                  <article key={message._id} className="dashboard-order-card dashboard-message-card">
+                    <div className="dashboard-order-card__main">
+                      <div className="dashboard-order-card__top">
+                        <span>Message</span>
+                        <strong>{message.customerName}</strong>
+                      </div>
+                      <div className="dashboard-order-card__customer">
+                        <p>{message.message}</p>
+                        {message.customerEmail ? <p>{message.customerEmail}</p> : null}
+                      </div>
+                    </div>
+                    <div className="dashboard-order-card__side">
+                      <span>{new Date(message.createdAt).toLocaleString()}</span>
+                      <strong>{message.customerPhone}</strong>
+                      {getPhoneDigits(message.customerPhone) ? (
+                        <a href={`tel:${getPhoneDigits(message.customerPhone)}`} title="Call customer" aria-label="Call customer">
+                          <Phone size={16} aria-hidden="true" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
         {activeTab === "profile" ? (
           <section className="vendor-score__products vendor-profile-panel" aria-labelledby="dashboard-profile-title">
             <div className="vendor-profile-panel__header">
@@ -966,6 +1085,18 @@ function Dashboard() {
                   <span>Longitude optional</span>
                   <input value={profileForm.lng} onChange={(event) => updateProfileForm("lng", event.target.value)} placeholder="76.7794" />
                 </label>
+                <label className="field">
+                  <span><SocialBadge label="IG" /> Instagram</span>
+                  <input value={profileForm.socialLinks.instagram} onChange={(event) => updateSocialForm("instagram", event.target.value)} placeholder="https://instagram.com/yourstore" />
+                </label>
+                <label className="field">
+                  <span><SocialBadge label="f" /> Facebook</span>
+                  <input value={profileForm.socialLinks.facebook} onChange={(event) => updateSocialForm("facebook", event.target.value)} placeholder="https://facebook.com/yourstore" />
+                </label>
+                <label className="field">
+                  <span><SocialBadge label="in" /> LinkedIn</span>
+                  <input value={profileForm.socialLinks.linkedin} onChange={(event) => updateSocialForm("linkedin", event.target.value)} placeholder="https://linkedin.com/company/yourstore" />
+                </label>
               </div>
               {profileError ? <p className="status-text status-text--error">{profileError}</p> : null}
               {profileStatus ? <p className="status-text status-text--success">{profileStatus}</p> : null}
@@ -983,6 +1114,9 @@ function Dashboard() {
                 <h2 id="dashboard-products-title">Products</h2>
                 <span>{products.length} live</span>
               </div>
+              <button type="button" className="button" onClick={startAddingProduct}>
+                Add Product
+              </button>
             </div>
             <div className="dashboard-product-toolbar">
               <label className="dashboard-product-search">
@@ -1050,83 +1184,120 @@ function Dashboard() {
                 ))}
               </div>
             )}
-
-            {store && isProductFormOpen ? (
-              <>
-            <h2 id="dashboard-add-product-title" className="dashboard-form-title">
-              {editingProductId ? "Edit product" : "Add product"}
-            </h2>
-            <form className="form-panel dashboard-product-form" onSubmit={handleSaveProduct}>
-              <label className="field">
-                <span>{t("store.productName")}</span>
-                <input
-                  type="text"
-                  value={productForm.name}
-                  onChange={(event) => updateProductForm("name", event.target.value)}
-                  placeholder={t("store.productNamePlaceholder")}
-                />
-              </label>
-              <label className="field">
-                <span>{t("store.productDescription")}</span>
-                <textarea
-                  value={productForm.description}
-                  onChange={(event) => updateProductForm("description", event.target.value)}
-                  placeholder={t("store.productDescriptionPlaceholder")}
-                />
-              </label>
-              <label className="field">
-                <span>Product image URL optional</span>
-                <input
-                  type="url"
-                  value={productForm.imageUrl}
-                  onChange={(event) => updateProductForm("imageUrl", event.target.value)}
-                  placeholder="https://example.com/product.jpg"
-                />
-              </label>
-              <div className="field-grid">
-                <label className="field">
-                  <span>{t("store.productPrice")}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={productForm.price}
-                    onChange={(event) => updateProductForm("price", event.target.value)}
-                    placeholder="499"
-                  />
-                </label>
-                <label className="field">
-                  <span>{t("store.productStock")}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={productForm.stock}
-                    onChange={(event) => updateProductForm("stock", event.target.value)}
-                    placeholder="12"
-                  />
-                </label>
-              </div>
-              {productError ? <p className="status-text status-text--error">{productError}</p> : null}
-              {productStatus ? <p className="status-text status-text--success">{productStatus}</p> : null}
-              <button type="submit" className="button" disabled={isAddingProduct}>
-                {isAddingProduct
-                  ? t("store.addingProduct")
-                  : editingProductId
-                    ? t("store.updateProductButton")
-                    : t("store.addProductButton")}
-              </button>
-              {editingProductId ? (
-                <button type="button" className="button--ghost" onClick={resetProductForm}>
-                  {t("store.cancelEdit")}
-                </button>
-              ) : null}
-            </form>
-              </>
-            ) : null}
           </section>
         ) : null}
       </section>
+      <Modal isOpen={Boolean(store && isProductFormOpen)} onClose={resetProductForm}>
+        <div className="dashboard-product-modal">
+          {productStatus && !editingProductId && !productError ? (
+            <section className="dashboard-product-success" aria-live="polite">
+              <span className="dashboard-product-success__icon">
+                <CheckCircle2 size={34} aria-hidden="true" />
+              </span>
+              <h2>Product added</h2>
+              <p>{productStatus || "Your product has been added to the store."}</p>
+              <div className="dashboard-product-modal__actions">
+                <button type="button" className="button" onClick={startAddingProduct}>
+                  Add another product
+                </button>
+                <button type="button" className="button--ghost" onClick={resetProductForm}>
+                  Done
+                </button>
+              </div>
+            </section>
+          ) : (
+            <>
+              <header className="dashboard-product-modal__header">
+                <div>
+                  <span>Product catalog</span>
+                  <h2 id="dashboard-add-product-title">{editingProductId ? "Edit product" : "Add product"}</h2>
+                  <p>{editingProductId ? "Update this product's details and save the changes." : "Add the product customers will see on your public store."}</p>
+                </div>
+                <button type="button" onClick={resetProductForm} aria-label="Close product form">
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </header>
+              <form className="form-panel dashboard-product-form" onSubmit={handleSaveProduct}>
+                <label className="field">
+                  <span>{t("store.productName")}</span>
+                  <input
+                    type="text"
+                    value={productForm.name}
+                    onChange={(event) => updateProductForm("name", event.target.value)}
+                    placeholder={t("store.productNamePlaceholder")}
+                  />
+                </label>
+                <label className="field">
+                  <span>{t("store.productDescription")}</span>
+                  <textarea
+                    value={productForm.description}
+                    onChange={(event) => updateProductForm("description", event.target.value)}
+                    placeholder={t("store.productDescriptionPlaceholder")}
+                  />
+                </label>
+                <label className="field">
+                  <span>Product image URL optional</span>
+                  <input
+                    type="url"
+                    value={productForm.imageUrl}
+                    onChange={(event) => updateProductForm("imageUrl", event.target.value)}
+                    placeholder="https://example.com/product.jpg"
+                  />
+                </label>
+                <div className="field-grid">
+                  <label className="field">
+                    <span>{t("store.productPrice")}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={productForm.price}
+                      onChange={(event) => updateProductForm("price", event.target.value)}
+                      placeholder="499"
+                    />
+                    {priceSuggestion ? (
+                      <button
+                        type="button"
+                        className="price-suggestion-card"
+                        onClick={() => updateProductForm("price", String(Number(productForm.price)))}
+                        aria-label={`Use ${priceSuggestion.label} as product price`}
+                      >
+                        <span>Price preview</span>
+                        <strong>{priceSuggestion.label}</strong>
+                        <small>{priceSuggestion.copy}</small>
+                      </button>
+                    ) : null}
+                  </label>
+                  <label className="field">
+                    <span>{t("store.productStock")}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={productForm.stock}
+                      onChange={(event) => updateProductForm("stock", event.target.value)}
+                      placeholder="12"
+                    />
+                  </label>
+                </div>
+                {productError ? <p className="status-text status-text--error">{productError}</p> : null}
+                <div className="dashboard-product-modal__actions">
+                  <button type="submit" className="button" disabled={isAddingProduct}>
+                    {isAddingProduct
+                      ? t("store.addingProduct")
+                      : editingProductId
+                        ? t("store.updateProductButton")
+                        : t("store.addProductButton")}
+                  </button>
+                  <button type="button" className="button--ghost" onClick={resetProductForm}>
+                    {editingProductId ? t("store.cancelEdit") : "Cancel"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+      </Modal>
       <Modal isOpen={isShareDialogOpen} onClose={() => setIsShareDialogOpen(false)}>
         <div className="share-store-dialog">
           <header className="share-store-dialog__header">
