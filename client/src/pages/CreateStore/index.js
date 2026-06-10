@@ -52,7 +52,7 @@ function hasValidCoordinates(values) {
   const lat = getCoordinate(values.lat);
   const lng = getCoordinate(values.lng);
 
-  return lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  return lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0);
 }
 
 function getPublicStoreUrl(store) {
@@ -176,6 +176,10 @@ function CreateStore() {
       return fieldError;
     }
 
+    if (step === 3 && !hasValidCoordinates(values)) {
+      return "Use current location so your store can be placed on the map.";
+    }
+
     return "";
   }
 
@@ -254,7 +258,7 @@ function CreateStore() {
       () => {
         setError({
           title: "We could not detect your location",
-          message: "You can continue by entering your landmark and address, then update the map pin later.",
+          message: "Allow browser location access and try again while you are at the store. This is needed to place your store on the map.",
         });
         setIsLocating(false);
       },
@@ -432,7 +436,7 @@ function CreateStore() {
               <section className="store-step">
                 <div className="store-step__header">
                   <h1>Location</h1>
-                  <p>Add enough context for customers to find or trust your store.</p>
+                  <p>Use the current location while you are at the store so customers can find it on the map.</p>
                 </div>
                 <button type="button" className="store-location-button" onClick={handleLocate} disabled={isLocating}>
                   <LocateFixed size={18} />
@@ -442,7 +446,9 @@ function CreateStore() {
                   <p className="store-location-confirmed">
                     <Check size={16} /> Location added successfully
                   </p>
-                ) : null}
+                ) : (
+                  <p className="store-location-required">Location is required before this store can be listed on the map.</p>
+                )}
                 <label className="field">
                   <span>Landmark/nearby place</span>
                   <input name="landmark" value={values.landmark} onChange={updateField} onBlur={() => markTouched(["landmark"])} />

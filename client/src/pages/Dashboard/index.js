@@ -23,7 +23,9 @@ const initialProductForm = {
 const dashboardTabs = [
   { id: "products", label: "Products" },
   { id: "orders", label: "Orders" },
-  { id: "help", label: "Help" },
+  { id: "payments", label: "Payments" },
+  { id: "sales", label: "Sales" },
+  { id: "favorites", label: "My Favorite Ones" },
 ];
 
 const productSortOptions = [
@@ -272,6 +274,12 @@ function Dashboard() {
   const isMapReady = Boolean(store?.showOnMap && store?.location?.lat && store?.location?.lng);
   const lowStockProducts = products.filter((product) => Number(product.stock || 0) <= 3);
   const openOrders = orders.filter((order) => !["completed", "cancelled"].includes(order.status));
+  const completedOrders = orders.filter((order) => order.status === "completed");
+  const activeOrders = orders.filter((order) => order.status !== "cancelled");
+  const pendingPaymentOrders = orders.filter((order) => ["created", "payment_pending", "confirmed", "preparing"].includes(order.status));
+  const totalSales = activeOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
+  const completedSales = completedOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
+  const pendingPaymentTotal = pendingPaymentOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
   const topShelfProducts = products.slice(0, 6);
   const totalInventoryValue = products.reduce((sum, product) => sum + Number(product.price || 0) * Number(product.stock || 0), 0);
   const recentProducts = products.slice(0, 5);
@@ -290,32 +298,6 @@ function Dashboard() {
     { label: "Complete store profile", done: Boolean(store?.description && store?.address && store?.category) },
   ];
   const setupProgress = Math.max(25, Math.round((setupChecklist.filter((item) => item.done).length / setupChecklist.length) * 100));
-  const operationsQueue = [
-    {
-      tone: isMapReady ? "is-done" : "is-warning",
-      label: "Discovery",
-      title: isMapReady ? "Map listing is live" : "Map pin required",
-      copy: isMapReady
-        ? "This shop can appear in map discovery. Keep hours and contact details accurate."
-        : "Add a precise location so customers can find this shop.",
-    },
-    {
-      tone: lowStockProducts.length ? "is-warning" : "is-done",
-      label: "Inventory",
-      title: lowStockProducts.length ? `${lowStockProducts.length} products need stock review` : "Stock levels are stable",
-      copy: products.length
-        ? "Prioritize unavailable and low-stock products before promoting the shop."
-        : "Add products to make the shop searchable.",
-    },
-    {
-      tone: openOrders.length ? "is-warning" : "is-muted",
-      label: "Orders",
-      title: openOrders.length ? `${openOrders.length} orders need action` : "No open orders",
-      copy: openOrders.length
-        ? "Review customer details, payment mode, and pickup follow-up."
-        : "Orders will appear here when customers checkout from the storefront.",
-    },
-  ];
   const profileRows = [
     { label: "Owner name", value: ownerName || "Not listed" },
     { label: "Store name", value: store?.name || "Not listed" },
@@ -323,12 +305,13 @@ function Dashboard() {
     { label: "Email", value: store?.email || vendor?.email || "Not listed" },
     { label: "Payment method", value: getPaymentLabel(store) },
   ];
-  const dashboardStatus = !store ? "Setup needed" : isMapReady ? "Live" : "Map missing";
-  const dashboardStatusTone = !store ? "is-warning" : isMapReady ? "is-live" : "is-warning";
+  const dashboardStatus = store?.workingHours || "Open now";
+  const dashboardStatusTone = "is-live";
   const healthMetrics = [
-    { label: "Products", value: products.length },
-    { label: "Low stock", value: lowStockProducts.length },
-    { label: "Open orders", value: openOrders.length },
+    { label: "Orders", value: openOrders.length, detail: `${orders.length} total` },
+    { label: "Payments", value: formatCurrency(pendingPaymentTotal), detail: `${pendingPaymentOrders.length} pending` },
+    { label: "Sales", value: formatCurrency(totalSales), detail: `${completedOrders.length} completed` },
+    { label: "Products", value: products.length, detail: `${lowStockProducts.length} low stock` },
   ];
   const productSearchTerm = productSearch.trim().toLowerCase();
   const visibleProducts = products
@@ -575,10 +558,13 @@ function Dashboard() {
               </div>
               <div className="dashboard-store-header__copy">
                 <div className="dashboard-store-header__title-row">
-                  <h1>{store?.name || "Shop dashboard"}</h1>
+                  <h1>Hello, {store?.name || "your store"}</h1>
                   <span className={`dashboard-status ${dashboardStatusTone}`}>{dashboardStatus}</span>
                 </div>
-                <p>{store?.category || "Storefront"}</p>
+                <p>
+                  {store?.storeCode ? `Store ID: ${store.storeCode}` : "Your workspace for orders, payments, sales, and products."}
+                </p>
+                <small>Your workspace for orders, payments, sales, and products.</small>
               </div>
             </div>
             {store ? (
@@ -610,13 +596,16 @@ function Dashboard() {
                   {isAccountMenuOpen ? (
                     <div className="dashboard-account-menu__panel" role="menu">
                       <button type="button" role="menuitem" onClick={() => openDashboardSection("profile")}>
-                        Store Settings
+                        My profile
                       </button>
-                      <Link to="/vendor-policy" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>
-                        Policies
+                      <button type="button" role="menuitem" onClick={() => openDashboardSection("profile")}>
+                        Settings
+                      </button>
+                      <Link to="/support" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>
+                        Help
                       </Link>
                       <button type="button" role="menuitem" onClick={handleSignOut}>
-                        Sign Out
+                        Log out
                       </button>
                     </div>
                   ) : null}
@@ -632,7 +621,10 @@ function Dashboard() {
         <div className="dashboard-health" aria-label="Shop health">
           {healthMetrics.map((metric) => (
             <article key={metric.label}>
-              <span>{metric.label}</span>
+              <div>
+                <span>{metric.label}</span>
+                <small>{metric.detail}</small>
+              </div>
               <strong>{metric.value}</strong>
             </article>
           ))}
@@ -662,32 +654,126 @@ function Dashboard() {
           ))}
         </div>
 
-        {activeTab === "help" ? (
-          <section className="vendor-score__products vendor-help-panel" aria-labelledby="dashboard-help-title">
+        {activeTab === "payments" ? (
+          <section className="vendor-score__products vendor-requests-panel" aria-labelledby="dashboard-payments-title">
             <div className="vendor-profile-panel__header">
               <div>
-                <h2 id="dashboard-help-title">Help</h2>
-                <p>Simple support options for shop setup, product listing, map visibility, and order handling.</p>
+                <h2 id="dashboard-payments-title">Payments</h2>
+                <p>Track payment value connected to customer orders.</p>
               </div>
-              <span>Support</span>
+              <span>{formatCurrency(pendingPaymentTotal)} pending</span>
             </div>
-            <div className="vendor-score__tools vendor-score__tools--help">
+            <div className="dashboard-order-summary" aria-label="Payment summary">
               <article>
-                <span>Shop setup</span>
-                <strong>Need help setting up this shop?</strong>
-                <p>Check shop name, address, customer phone, working hours, and at least one searchable product.</p>
+                <span>Pending</span>
+                <strong>{formatCurrency(pendingPaymentTotal)}</strong>
               </article>
               <article>
-                <span>Map visibility</span>
-                <strong>Not showing on the map?</strong>
-                <p>Add a precise map pin from the create-store flow or update the location when store profile editing is enabled.</p>
+                <span>Completed sales</span>
+                <strong>{formatCurrency(completedSales)}</strong>
               </article>
               <article>
-                <span>Contact</span>
-                <strong>support@snafleshub.com</strong>
-                <p>Use this for account access, product visibility, and launch support.</p>
+                <span>Payment method</span>
+                <strong>{getPaymentLabel(store)}</strong>
               </article>
             </div>
+            {orders.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <PackageCheck size={28} aria-hidden="true" />
+                <h3>No payment activity yet</h3>
+                <p>Payments will appear here after customers place orders.</p>
+              </div>
+            ) : (
+              <div className="vendor-request-list">
+                {activeOrders.map((order) => (
+                  <article key={order._id} className={`dashboard-order-card dashboard-order-card--${order.status}`}>
+                    <div className="dashboard-order-card__main">
+                      <div className="dashboard-order-card__top">
+                        <span>{formatOrderStatus(order.status)}</span>
+                        <strong>Order #{String(order._id).slice(-6).toUpperCase()}</strong>
+                      </div>
+                      <div className="dashboard-order-card__customer">
+                        <strong>{order.customer?.name || "Customer"}</strong>
+                        <p>{order.paymentMode === "pay_at_store" ? "Pay at store" : order.paymentMode === "test_online" ? "Test online" : "Cash on delivery"}</p>
+                      </div>
+                    </div>
+                    <div className="dashboard-order-card__side">
+                      <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                      <strong>{formatCurrency(order.subtotal)}</strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {activeTab === "sales" ? (
+          <section className="vendor-score__products vendor-requests-panel" aria-labelledby="dashboard-sales-title">
+            <div className="vendor-profile-panel__header">
+              <div>
+                <h2 id="dashboard-sales-title">Sales</h2>
+                <p>See the value moving through this store.</p>
+              </div>
+              <span>{formatCurrency(totalSales)} total</span>
+            </div>
+            <div className="dashboard-order-summary" aria-label="Sales summary">
+              <article>
+                <span>Total sales</span>
+                <strong>{formatCurrency(totalSales)}</strong>
+              </article>
+              <article>
+                <span>Completed</span>
+                <strong>{formatCurrency(completedSales)}</strong>
+              </article>
+              <article>
+                <span>Inventory value</span>
+                <strong>{formatCurrency(totalInventoryValue)}</strong>
+              </article>
+            </div>
+            <div className="dashboard-empty-state">
+              <PackageCheck size={28} aria-hidden="true" />
+              <h3>{orders.length ? "Sales summary is ready" : "No sales yet"}</h3>
+              <p>{orders.length ? "A fuller sales chart can come in the next dashboard slice." : "Sales will build as customer orders come in."}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "favorites" ? (
+          <section className="vendor-score__products dashboard-products" aria-labelledby="dashboard-favorites-title">
+            <div className="dashboard-section-header">
+              <div>
+                <h2 id="dashboard-favorites-title">My Favorite Ones</h2>
+                <span>{topShelfProducts.length} products shown</span>
+              </div>
+            </div>
+            {topShelfProducts.length === 0 ? (
+              <div className="dashboard-empty-state">
+                <PackagePlus size={34} aria-hidden="true" />
+                <strong>No products yet</strong>
+                <p>Add products first, then this area can become the vendor's favorite list.</p>
+              </div>
+            ) : (
+              <div className="dashboard-product-grid">
+                {topShelfProducts.map((product) => (
+                  <article className={`dashboard-product-card ${getStockTone(product)}`} key={product._id}>
+                    <div className="dashboard-product-card__visual">
+                      {product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span>{getProductInitials(product.name)}</span>}
+                    </div>
+                    <div className="dashboard-product-card__body">
+                      <div className="dashboard-product-card__top">
+                        <strong>{product.name}</strong>
+                        <span className={`shop-shelf-card__badge ${getStockTone(product)}`}>{getStockLabel(product)}</span>
+                      </div>
+                      <div className="dashboard-product-card__meta">
+                        <span>{formatCurrency(product.price)}</span>
+                        <small>{Number(product.stock || 0)} stock</small>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         ) : null}
 

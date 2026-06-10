@@ -2521,6 +2521,15 @@ button:disabled,
   font-weight: 750;
 }
 
+.dashboard-store-header__copy small {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-body);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .dashboard-status {
   display: inline-flex;
   min-height: 26px;
@@ -2690,7 +2699,7 @@ button:disabled,
 
 .dashboard-health {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -2707,15 +2716,25 @@ button:disabled,
 }
 
 .dashboard-health span {
+  display: block;
   color: var(--color-muted);
   font-size: 13px;
   font-weight: 800;
 }
 
+.dashboard-health small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-body);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .dashboard-health strong {
   color: var(--color-heading);
-  font-size: 20px;
+  font-size: clamp(18px, 2vw, 22px);
   font-weight: 900;
+  text-align: right;
 }
 
 .vendor-score__tabs {

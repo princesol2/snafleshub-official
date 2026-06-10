@@ -38,6 +38,7 @@ const mapTileSources = {
 const mapAttribution =
   '<a href="https://maplibre.org/" target="_blank" rel="noreferrer">MapLibre</a> | © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors | Tiles © Esri';
 const defaultCenter = [76.7794, 30.7333];
+const storeRefreshIntervalMs = 15000;
 
 function createMapStyle(mode) {
   const tileSource = mapTileSources[mode] || mapTileSources[mapModes.street];
@@ -421,11 +422,15 @@ function MapView() {
     let isMounted = true;
     const searchTerm = query.trim();
 
-    const loadStores = async () => {
+    const loadStores = async ({ silent = false } = {}) => {
       try {
-        setIsLoading(true);
+        if (!silent) {
+          setIsLoading(true);
+        }
         setError("");
-        setProductsByStore({});
+        if (!silent) {
+          setProductsByStore({});
+        }
         const response = await api.get("/api/stores", {
           params: searchTerm ? { search: searchTerm } : {},
         });
@@ -435,29 +440,35 @@ function MapView() {
         }
 
         setStores(response.data.data || []);
-        setActiveStoreId("");
+        if (!silent) {
+          setActiveStoreId("");
+        }
       } catch (requestError) {
         if (!isMounted) {
           return;
         }
 
-        setStores([]);
-        setActiveStoreId("");
+        if (!silent) {
+          setStores([]);
+          setActiveStoreId("");
+        }
         setError(requestError.response?.data?.message || t("map.unavailable"));
       } finally {
-        if (isMounted) {
+        if (isMounted && !silent) {
           setIsLoading(false);
         }
       }
     };
 
     const timeout = window.setTimeout(loadStores, 220);
+    const interval = window.setInterval(() => loadStores({ silent: true }), storeRefreshIntervalMs);
 
     return () => {
       isMounted = false;
       window.clearTimeout(timeout);
+      window.clearInterval(interval);
     };
-  }, [query]);
+  }, [query, t]);
 
   const mapStores = useMemo(() => {
     return stores
