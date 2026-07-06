@@ -23,17 +23,21 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: npm install, build, and test
+      - name: Install and build frontend
         run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+          npm ci --prefix client
+          npm run build --prefix client
+
+      - name: Install backend production dependencies
+        run: npm ci --omit=dev --prefix server
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: |
+            client/dist
+            server
 
   deploy:
     runs-on: ubuntu-latest
