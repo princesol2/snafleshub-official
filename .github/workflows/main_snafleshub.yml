@@ -36,6 +36,7 @@ jobs:
         with:
           name: node-app
           path: |
+            package.json
             client/dist
             server
 

@@ -1,0 +1,11 @@
+{
+  "name": "snafleshub-official",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
