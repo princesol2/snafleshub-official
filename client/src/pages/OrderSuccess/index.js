@@ -4,7 +4,50 @@ import { CheckCircle2, Clock, PackageCheck, ShoppingBag } from "lucide-react";
 import api from "../../services/api";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import { formatPrice, mongoObjectIdPattern } from "../../utils/storefront";
+import { demoOrderId, demoOrderToken, getSavedDemoOrder, isDemoStoreId } from "../../utils/demoStore";
 import "./OrderSuccess.css";
+
+function getPaymentLabel(order) {
+  if (order?.paymentMode === "online" || order?.paymentMode === "test_online") {
+    return order.status === "confirmed" ? "Paid online" : "Online payment pending";
+  }
+
+  if (order?.paymentMode === "pay_at_store") {
+    return "Pay at store";
+  }
+
+  if (order?.paymentMode === "manual_upi") {
+    if (order.status === "confirmed") {
+      return "UPI confirmed";
+    }
+
+    if (order.status === "payment_failed") {
+      return "UPI not received";
+    }
+
+    return "UPI submitted";
+  }
+
+  return "Cash/manual";
+}
+
+function getOrderTitle(order) {
+  if (order?.paymentMode === "manual_upi" && order.status === "payment_submitted") {
+    return "Payment submitted";
+  }
+
+  return "Order confirmed";
+}
+
+function getOrderCopy(order) {
+  const orderNumber = String(order?._id || "").slice(-6).toUpperCase();
+
+  if (order?.paymentMode === "manual_upi" && order.status === "payment_submitted") {
+    return `Order #${orderNumber} has been sent to the store. The vendor will confirm the UPI payment before fulfillment.`;
+  }
+
+  return `Order #${orderNumber} has been sent to the store. They will contact you to confirm payment and fulfillment.`;
+}
 
 function OrderSuccess() {
   const { storeId, orderId } = useParams();
@@ -19,6 +62,19 @@ function OrderSuccess() {
     let isMounted = true;
 
     const loadOrder = async () => {
+      if (isDemoStoreId(storeId) && orderId === demoOrderId && token === demoOrderToken) {
+        const savedDemoOrder = getSavedDemoOrder();
+
+        if (savedDemoOrder) {
+          setOrder(savedDemoOrder);
+        } else {
+          setError("This demo order was not found. Add products and place a demo order again.");
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
       if (!mongoObjectIdPattern.test(orderId || "") || !token) {
         setError("This order confirmation link is not available.");
         setIsLoading(false);
@@ -68,12 +124,9 @@ function OrderSuccess() {
           <div className="order-success-card__icon">
             <CheckCircle2 size={44} aria-hidden="true" />
           </div>
-          <span>Order successful</span>
-          <h1>Order confirmed</h1>
-          <p>
-            Order #{String(order._id).slice(-6).toUpperCase()} has been sent to the store. They will contact you to
-            confirm payment and fulfillment.
-          </p>
+          <span>{order.paymentMode === "manual_upi" && order.status === "payment_submitted" ? "Payment review" : "Order successful"}</span>
+          <h1>{getOrderTitle(order)}</h1>
+          <p>{getOrderCopy(order)}</p>
 
           <section className="order-success-summary" aria-label="Order summary">
             <div>
@@ -84,7 +137,7 @@ function OrderSuccess() {
             <div>
               <Clock size={18} aria-hidden="true" />
               <span>Payment</span>
-              <strong>Cash/manual</strong>
+              <strong>{getPaymentLabel(order)}</strong>
             </div>
             <div>
               <ShoppingBag size={18} aria-hidden="true" />
@@ -112,6 +165,14 @@ function OrderSuccess() {
             <p>{order.customer.phone}</p>
             <p>{order.customer.address}</p>
           </section>
+
+          {order.paymentMode === "manual_upi" && order.payment?.metadata?.upiReference ? (
+            <section className="order-success-customer" aria-label="UPI payment details">
+              <h2>UPI payment submitted</h2>
+              <p>Reference: {order.payment.metadata.upiReference}</p>
+              <p>The store will verify this payment in their UPI app before preparing the order.</p>
+            </section>
+          ) : null}
 
           <div className="order-success-actions">
             <Link to={`/store/${storeId}`}>Continue shopping</Link>

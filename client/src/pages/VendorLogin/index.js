@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, Eye, EyeOff, PackageCheck, ShoppingBag } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import api from "../../services/api";
 import { useLanguage } from "../../i18n/LanguageContext";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import { setAuthToken, setSavedPhone, setStore, setVendor } from "../../services/session";
-import BrandMark from "../../components/BrandMark";
 import SystemAlert from "../../components/SystemAlert";
 import { normalizeApiError } from "../../utils/errors";
 import { isValidPassword, isValidPhone } from "../../utils/validation";
+import storefrontImage from "../../../img/storefront.jpg";
 
 const authModes = {
   store: "store",
@@ -175,40 +175,11 @@ function VendorLogin() {
     <div className="page">
       <section className="auth-layout vendor-login-shell">
           <aside className="vendor-login-picture" aria-label="SnaflesHub dashboard preview">
+            <img className="vendor-login-picture__image" src={storefrontImage} alt="" />
             <div className="vendor-login-brand-panel">
-              <div className="vendor-login-brand">
-                <BrandMark />
-                <span>SnaflesHub</span>
-              </div>
               <div className="vendor-login-brand-copy">
-                <h1>Run your store from one dashboard</h1>
-                <p>Manage products, orders, analytics, customers, and storefront settings in one place.</p>
-              </div>
-              <div className="vendor-login-preview" aria-hidden="true">
-                <div className="vendor-login-preview__top">
-                  <span>Today</span>
-                  <strong>Store dashboard</strong>
-                </div>
-                <div className="vendor-login-preview__metrics">
-                  <article>
-                    <ShoppingBag size={18} />
-                    <span>Orders</span>
-                    <strong>24</strong>
-                  </article>
-                  <article>
-                    <PackageCheck size={18} />
-                    <span>Products</span>
-                    <strong>128</strong>
-                  </article>
-                  <article>
-                    <BarChart3 size={18} />
-                    <span>Reach</span>
-                    <strong>8.4k</strong>
-                  </article>
-                </div>
-                <div className="vendor-login-preview__bar">
-                  <span />
-                </div>
+                <h1>Log in your storefront</h1>
+                <p>Manage your products, orders, payments, and store details.</p>
               </div>
             </div>
           </aside>
@@ -217,8 +188,8 @@ function VendorLogin() {
             {activeMode === authModes.store ? (
               <form className="vendor-login-form" onSubmit={handleStoreLoginSubmit} noValidate>
                 <div className="vendor-login-form__header">
-                  <h1 className="vendor-login-title">Storefront login</h1>
-                  <p>Access your SnaflesHub store dashboard</p>
+                  <h1 className="vendor-login-title">Log in your storefront</h1>
+                  <p>Manage your products, orders, payments, and store details.</p>
                 </div>
                 <label className="vendor-login-field">
                   <span>Store ID or work phone</span>
@@ -275,7 +246,7 @@ function VendorLogin() {
                   {isSubmitting ? t("otp.verifying") : t("login.login")}
                 </button>
                 <p className="vendor-login-create-link">
-                  New vendor? <Link to="/vendor/create-store">Create your store</Link>
+                  New owner? <Link to="/vendor/create-store">Create your storefront</Link>
                 </p>
               </form>
             ) : activeMode === authModes.otp ? (
@@ -315,15 +286,6 @@ function VendorLogin() {
                   <p>Use your work phone to receive a reset code. Store ID is optional if you remember it.</p>
                 </div>
                 <label className="vendor-login-field">
-                  <span>Store ID optional</span>
-                  <input
-                    type="text"
-                    placeholder="Enter Store ID if you remember it"
-                    value={resetStoreId}
-                    onChange={(event) => setResetStoreId(event.target.value)}
-                  />
-                </label>
-                <label className="vendor-login-field">
                   <span>{t("login.phone")}</span>
                   <input
                     type="tel"
@@ -331,6 +293,15 @@ function VendorLogin() {
                     value={resetPhone}
                     onChange={(event) => setResetPhone(event.target.value)}
                     required
+                  />
+                </label>
+                <label className="vendor-login-field">
+                  <span>Store ID optional</span>
+                  <input
+                    type="text"
+                    placeholder="Enter Store ID if you remember it"
+                    value={resetStoreId}
+                    onChange={(event) => setResetStoreId(event.target.value)}
                   />
                 </label>
                 {isResetCodeSent ? (

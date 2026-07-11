@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Send,
+  Share2,
   ShoppingBag,
   ShoppingCart,
   Trash2,
@@ -33,6 +34,15 @@ import {
   isVendorStoreOwner,
   mongoObjectIdPattern,
 } from "../../utils/storefront";
+import {
+  createDemoOrder,
+  demoOrderId,
+  demoOrderToken,
+  demoProducts,
+  demoStore,
+  isDemoStoreId,
+  saveDemoOrder,
+} from "../../utils/demoStore";
 import "./StoreView.css";
 
 function getCartStorageKey(storeId) {
@@ -71,6 +81,14 @@ function StoreView() {
     let isMounted = true;
 
     const loadStore = async () => {
+      if (isDemoStoreId(id)) {
+        setStore(demoStore);
+        setProducts(demoProducts);
+        setError("");
+        setIsLoading(false);
+        return;
+      }
+
       if (!mongoObjectIdPattern.test(id || "")) {
         setError(t("store.unavailableCopy"));
         setIsLoading(false);
@@ -190,7 +208,7 @@ function StoreView() {
         message: messageForm.message.trim(),
       });
 
-      setMessageStatus(response.data.message || "Message sent to vendor.");
+      setMessageStatus(response.data.message || "Message sent to owner.");
       setMessageForm({ name: "", phone: "", email: "", message: "" });
     } catch (requestError) {
       setMessageError(requestError.response?.data?.message || "Unable to send this message. Please try again.");
@@ -201,7 +219,7 @@ function StoreView() {
 
   const addToCart = (product) => {
     if (isOwnStorePreview) {
-      setCartNotice("Preview mode: vendors cannot place orders from their own store account.");
+      setCartNotice("Preview mode: owners cannot place orders from their own storefront account.");
       return;
     }
 
@@ -248,7 +266,7 @@ function StoreView() {
     setCheckoutError("");
 
     if (isOwnStorePreview) {
-      setCheckoutError("Preview mode: vendors cannot place orders from their own store account.");
+      setCheckoutError("Preview mode: owners cannot place orders from their own storefront account.");
       return;
     }
 
@@ -271,6 +289,25 @@ function StoreView() {
 
     try {
       setIsCheckingOut(true);
+
+      if (isDemoStoreId(id)) {
+        const demoOrder = createDemoOrder(
+          hydratedCart.map((item) => ({ productId: item.product._id, quantity: item.quantity })),
+          {
+            name: checkoutForm.name,
+            phone: checkoutForm.phone,
+            address: checkoutForm.address,
+          },
+          "cash_on_delivery"
+        );
+        saveDemoOrder(demoOrder);
+        setCartItems([]);
+        setCheckoutForm(initialCheckoutForm);
+        setIsCartOpen(false);
+        navigate(`/store/${id}/order-success/${demoOrderId}?token=${encodeURIComponent(demoOrderToken)}`, { replace: true });
+        return;
+      }
+
       const response = await api.post("/api/checkout", {
         storeId: store._id,
         items: hydratedCart.map((item) => ({
@@ -295,6 +332,31 @@ function StoreView() {
       setCheckoutError(requestError.response?.data?.message || "Unable to place this order. Please try again.");
     } finally {
       setIsCheckingOut(false);
+    }
+  };
+
+  const handleShareStore = async () => {
+    const shareUrl = window.location.href;
+    const shareTitle = `${store.name} on SnaflesHub`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: `Open ${store.name} on SnaflesHub.`,
+          url: shareUrl,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(shareUrl);
+      setCartNotice("Store link copied.");
+    } catch (shareError) {
+      if (shareError?.name === "AbortError") {
+        return;
+      }
+
+      setCartNotice("Store link is ready in the address bar.");
     }
   };
 
@@ -326,6 +388,10 @@ function StoreView() {
                 <span>{store.category || t("store.general")} · Store ID: {getStoreCode(store)}</span>
               </div>
               <div className="public-store__actions">
+                <button className="public-store__secondary" type="button" onClick={handleShareStore}>
+                  <Share2 size={16} aria-hidden="true" />
+                  Share
+                </button>
                 <button className="public-store__secondary" type="button" onClick={() => setIsMessageOpen(true)}>
                   <MessageCircle size={16} aria-hidden="true" />
                   Message
@@ -347,7 +413,7 @@ function StoreView() {
 
           {isOwnStorePreview ? (
             <p className="store-preview-notice" role="status">
-              You are viewing your own store as a vendor preview. Customer checkout is disabled for this account.
+              You are viewing your own storefront as an owner preview. Customer checkout is disabled for this account.
             </p>
           ) : null}
 
@@ -464,7 +530,7 @@ function StoreView() {
                         }}
                         disabled={product.stock === 0 || isOwnStorePreview}
                       >
-                        {isOwnStorePreview ? "Preview only" : "Pull in"}
+                        {isOwnStorePreview ? "Preview only" : "Buy now"}
                       </button>
                       <button
                         className="store-product-card__cart"
@@ -500,7 +566,7 @@ function StoreView() {
                   <p>{selectedProduct.stock > 0 ? `${selectedProduct.stock} in stock` : "Out of stock"}</p>
                   <button className="store-request-submit" type="button" onClick={() => addToCart(selectedProduct)} disabled={selectedProduct.stock === 0 || isOwnStorePreview}>
                     <ShoppingCart size={17} aria-hidden="true" />
-                    {isOwnStorePreview ? "Preview only" : "Pull in"}
+                    {isOwnStorePreview ? "Preview only" : "Add to cart"}
                   </button>
                 </div>
               </section>
@@ -515,9 +581,9 @@ function StoreView() {
                 </button>
                 <form className="store-request-form" onSubmit={submitVendorMessage} noValidate>
                   <div className="store-request-panel__header">
-                    <span>Vendor mailbox</span>
+                    <span>Owner mailbox</span>
                     <h2 id="vendor-message-title">Message {store.name}</h2>
-                    <p>Send a note inside SnaflesHub. To protect vendors, customers can send 2 messages per day.</p>
+                    <p>Send a note inside SnaflesHub. To protect owners, customers can send 2 messages per day.</p>
                   </div>
                   <label className="store-request-field">
                     <span>Name</span>

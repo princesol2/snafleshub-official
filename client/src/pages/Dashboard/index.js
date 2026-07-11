@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { CheckCircle2, ChevronDown, Copy, ExternalLink, MessageCircle, PackageCheck, PackagePlus, Phone, QrCode, Search, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Copy, ExternalLink, MessageCircle, PackageCheck, PackagePlus, Phone, Search, X } from "lucide-react";
 import api from "../../services/api";
 import Modal from "../../components/Modal";
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -26,7 +26,8 @@ const dashboardTabs = [
   { id: "messages", label: "Messages" },
   { id: "payments", label: "Payments" },
   { id: "sales", label: "Sales" },
-  { id: "favorites", label: "My Favorite Ones" },
+  { id: "profile", label: "Profile" },
+  { id: "settings", label: "Settings" },
 ];
 
 const productSortOptions = [
@@ -52,9 +53,13 @@ const initialProfileForm = {
   workPhone: "",
   email: "",
   description: "",
+  logoUrl: "",
+  coverImageUrl: "",
   workingHours: "",
   paymentType: "upi",
   upiId: "",
+  upiQrUrl: "",
+  upiQrReference: "",
   lat: "",
   lng: "",
   socialLinks: {
@@ -78,6 +83,13 @@ function getPaymentLabel(store) {
   }
 
   return store.upiId || store.paypalEmail || "Not listed";
+}
+
+function getUpiQrReference(values = {}) {
+  return ["SnaflesHub", values.name, values.ownerName, values.email || values.workPhone, values.category]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ");
 }
 
 function getProductInitials(name = "") {
@@ -140,6 +152,50 @@ function formatOrderStatus(value) {
   return String(value || "confirmed")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getOrderPaymentLabel(order) {
+  if (order?.paymentMode === "manual_upi") {
+    if (order?.paymentId?.status === "paid" || order?.status === "confirmed") {
+      return "UPI confirmed";
+    }
+
+    if (order?.paymentId?.status === "failed" || order?.status === "payment_failed") {
+      return "UPI rejected";
+    }
+
+    return "UPI submitted";
+  }
+
+  if (order?.paymentMode === "online" || order?.paymentMode === "test_online") {
+    if (order?.paymentId?.status === "paid" || order?.status === "confirmed") {
+      return "Online paid";
+    }
+
+    if (order?.paymentId?.status === "failed" || order?.status === "payment_failed") {
+      return "Online failed";
+    }
+
+    return "Online pending";
+  }
+
+  if (order?.paymentMode === "pay_at_store") {
+    return "Pay at store";
+  }
+
+  return "Cash/manual";
+}
+
+function canUpdateOrderStatus(order) {
+  return !["payment_pending", "payment_submitted", "payment_failed"].includes(order?.status);
+}
+
+function getManualUpiReference(order) {
+  return order?.paymentId?.metadata?.upiReference || "";
+}
+
+function getManualUpiScreenshot(order) {
+  return order?.paymentId?.metadata?.upiScreenshotUrl || "";
 }
 
 function getPhoneDigits(value) {
@@ -224,9 +280,13 @@ function Dashboard() {
             workPhone: currentStore.workPhone || "",
             email: currentStore.email || "",
             description: currentStore.description || "",
+            logoUrl: currentStore.logoUrl || "",
+            coverImageUrl: currentStore.coverImageUrl || "",
             workingHours: currentStore.workingHours || "",
             paymentType: currentStore.paymentType || "upi",
             upiId: currentStore.upiId || "",
+            upiQrUrl: currentStore.upiQrUrl || "",
+            upiQrReference: currentStore.upiQrReference || getUpiQrReference(currentStore),
             lat: currentStore.location?.lat ?? "",
             lng: currentStore.location?.lng ?? "",
             socialLinks: {
@@ -274,7 +334,7 @@ function Dashboard() {
             }
 
             setMessages([]);
-            setMessagesError("Unable to load vendor mailbox.");
+            setMessagesError("Unable to load owner mailbox.");
           }
         } else {
           setProducts([]);
@@ -325,7 +385,7 @@ function Dashboard() {
   const openOrders = orders.filter((order) => !["completed", "cancelled"].includes(order.status));
   const completedOrders = orders.filter((order) => order.status === "completed");
   const activeOrders = orders.filter((order) => order.status !== "cancelled");
-  const pendingPaymentOrders = orders.filter((order) => ["created", "payment_pending", "confirmed", "preparing"].includes(order.status));
+  const pendingPaymentOrders = orders.filter((order) => ["created", "payment_pending", "payment_submitted"].includes(order.status));
   const totalSales = activeOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
   const completedSales = completedOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
   const pendingPaymentTotal = pendingPaymentOrders.reduce((sum, order) => sum + Number(order.subtotal || 0), 0);
@@ -354,11 +414,20 @@ function Dashboard() {
     { label: "Email", value: store?.email || vendor?.email || "Not listed" },
     { label: "Payment method", value: getPaymentLabel(store) },
   ];
+  const accountJoinedDate = vendor?.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : "Not available";
+  const storeJoinedDate = store?.createdAt ? new Date(store.createdAt).toLocaleDateString() : "Not available";
+  const emailVerified = Boolean(vendor?.emailVerified || store?.emailVerified);
+  const settingsRows = [
+    { label: "Owner account", value: accountJoinedDate },
+    { label: "Store created", value: storeJoinedDate },
+    { label: "Email verification", value: emailVerified ? "Verified" : "Not verified yet" },
+    { label: "Store ID", value: store?.storeCode || String(store?._id || "").slice(-6).toUpperCase() || "Not available" },
+  ];
   const dashboardStatus = store?.workingHours || "Open now";
   const dashboardStatusTone = "is-live";
   const healthMetrics = [
     { label: "Orders", value: openOrders.length, detail: `${orders.length} total` },
-    { label: "Messages", value: messages.filter((message) => message.requestType === "message").length, detail: "vendor inbox" },
+    { label: "Messages", value: messages.filter((message) => message.requestType === "message").length, detail: "owner inbox" },
     { label: "Payments", value: formatCurrency(pendingPaymentTotal), detail: `${pendingPaymentOrders.length} pending` },
     { label: "Sales", value: formatCurrency(totalSales), detail: `${completedOrders.length} completed` },
   ];
@@ -416,6 +485,29 @@ function Dashboard() {
       setOrdersStatus(`Order #${String(orderId).slice(-6).toUpperCase()} marked ${formatOrderStatus(status)}.`);
     } catch (requestError) {
       setOrdersError(requestError.response?.data?.message || "Unable to update this order.");
+    } finally {
+      setUpdatingOrderId("");
+    }
+  };
+
+  const updateManualUpiPayment = async (orderId, decision) => {
+    try {
+      setUpdatingOrderId(orderId);
+      setOrdersError("");
+      setOrdersStatus("");
+      const response = await api.patch(`/api/checkout/orders/${orderId}/payment`, { decision });
+      const updatedOrder = response.data.data;
+
+      setOrders((currentOrders) =>
+        currentOrders.map((order) => (order._id === orderId ? { ...order, ...updatedOrder } : order))
+      );
+      setOrdersStatus(
+        decision === "confirm"
+          ? `UPI payment confirmed for order #${String(orderId).slice(-6).toUpperCase()}.`
+          : `UPI payment rejected for order #${String(orderId).slice(-6).toUpperCase()}.`
+      );
+    } catch (requestError) {
+      setOrdersError(requestError.response?.data?.message || "Unable to update this UPI payment.");
     } finally {
       setUpdatingOrderId("");
     }
@@ -580,9 +672,13 @@ function Dashboard() {
         workPhone: profileForm.workPhone.trim(),
         email: profileForm.email.trim(),
         description: profileForm.description.trim(),
+        logoUrl: profileForm.logoUrl.trim(),
+        coverImageUrl: profileForm.coverImageUrl.trim(),
         workingHours: profileForm.workingHours.trim(),
         paymentType: profileForm.paymentType,
         upiId: profileForm.upiId.trim(),
+        upiQrUrl: profileForm.upiQrUrl.trim(),
+        upiQrReference: (profileForm.upiQrReference || getUpiQrReference(profileForm)).trim(),
         location: hasLocation ? { lat, lng } : null,
         socialLinks: {
           instagram: profileForm.socialLinks.instagram.trim(),
@@ -632,14 +728,13 @@ function Dashboard() {
                 <p>
                   {store?.storeCode ? `Store ID: ${store.storeCode}` : "Your workspace for orders, payments, sales, and products."}
                 </p>
-                <small>Your workspace for orders, payments, sales, and products.</small>
               </div>
             </div>
             {store ? (
               <div className="vendor-score__header-actions">
                 <Link to={`/store/${store._id}`}>View Store</Link>
                 <button type="button" onClick={() => openDashboardSection("profile")}>
-                  Add my social
+                  Edit Profile
                 </button>
                 <button
                   type="button"
@@ -669,7 +764,7 @@ function Dashboard() {
                       <button type="button" role="menuitem" onClick={() => openDashboardSection("profile")}>
                         My profile
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDashboardSection("profile")}>
+                      <button type="button" role="menuitem" onClick={() => openDashboardSection("settings")}>
                         Settings
                       </button>
                       <Link to="/support" role="menuitem" onClick={() => setIsAccountMenuOpen(false)}>
@@ -748,6 +843,26 @@ function Dashboard() {
                 <strong>{getPaymentLabel(store)}</strong>
               </article>
             </div>
+            <div className="dashboard-upi-scanner">
+              <div>
+                <span>UPI scanner</span>
+                <h3>{store?.upiQrUrl ? "Scanner ready" : "No scanner added"}</h3>
+                <p>Add your UPI scanner image URL in Profile so customers can pay manually after placing an order.</p>
+                <strong className="dashboard-upi-scanner__reference">
+                  {store?.upiQrReference || getUpiQrReference(store)}
+                </strong>
+                <button type="button" onClick={() => openDashboardSection("profile")}>
+                  Manage scanner
+                </button>
+              </div>
+              {store?.upiQrUrl ? (
+                <img src={store.upiQrUrl} alt={`${store.name || "Store"} UPI scanner`} />
+              ) : (
+                <div className="dashboard-upi-scanner__empty" aria-hidden="true">
+                  QR
+                </div>
+              )}
+            </div>
             {orders.length === 0 ? (
               <div className="dashboard-empty-state">
                 <PackageCheck size={28} aria-hidden="true" />
@@ -765,7 +880,10 @@ function Dashboard() {
                       </div>
                       <div className="dashboard-order-card__customer">
                         <strong>{order.customer?.name || "Customer"}</strong>
-                        <p>{order.paymentMode === "pay_at_store" ? "Pay at store" : order.paymentMode === "test_online" ? "Test online" : "Cash on delivery"}</p>
+                        <p>{getOrderPaymentLabel(order)}</p>
+                        {order.paymentMode === "manual_upi" && getManualUpiReference(order) ? (
+                          <p>UPI ref: {getManualUpiReference(order)}</p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="dashboard-order-card__side">
@@ -822,7 +940,7 @@ function Dashboard() {
               <div className="dashboard-empty-state">
                 <PackagePlus size={34} aria-hidden="true" />
                 <strong>No products yet</strong>
-                <p>Add products first, then this area can become the vendor's favorite list.</p>
+                <p>Add products first, then this area can become a favorite list.</p>
               </div>
             ) : (
               <div className="dashboard-product-grid">
@@ -900,6 +1018,16 @@ function Dashboard() {
                         <strong>{order.customer?.name || "Customer"}</strong>
                         <p>{order.customer?.phone || "No phone listed"}</p>
                         {order.customer?.address ? <p>{order.customer.address}</p> : null}
+                        {order.paymentMode === "manual_upi" && getManualUpiReference(order) ? (
+                          <p>UPI ref: {getManualUpiReference(order)}</p>
+                        ) : null}
+                        {order.paymentMode === "manual_upi" && getManualUpiScreenshot(order) ? (
+                          <p>
+                            <a href={getManualUpiScreenshot(order)} target="_blank" rel="noreferrer">
+                              View payment screenshot
+                            </a>
+                          </p>
+                        ) : null}
                       </div>
                       <div className="dashboard-order-items">
                         {order.items?.map((item) => (
@@ -911,7 +1039,7 @@ function Dashboard() {
                     </div>
 
                     <div className="dashboard-order-card__side">
-                      <span>{order.paymentMode === "test_online" ? "Test online" : "Cash/manual"}</span>
+                      <span>{getOrderPaymentLabel(order)}</span>
                       <strong>{formatCurrency(order.subtotal)}</strong>
                       <p>{new Date(order.createdAt).toLocaleString()}</p>
                       <div className="dashboard-order-contact">
@@ -937,13 +1065,33 @@ function Dashboard() {
                     </div>
 
                     <div className="dashboard-order-actions">
+                      {order.paymentMode === "manual_upi" && order.status === "payment_submitted" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="is-payment-confirm"
+                            onClick={() => updateManualUpiPayment(order._id, "confirm")}
+                            disabled={updatingOrderId === order._id}
+                          >
+                            {updatingOrderId === order._id ? "Updating..." : "Confirm UPI received"}
+                          </button>
+                          <button
+                            type="button"
+                            className="is-payment-reject"
+                            onClick={() => updateManualUpiPayment(order._id, "reject")}
+                            disabled={updatingOrderId === order._id}
+                          >
+                            Reject UPI
+                          </button>
+                        </>
+                      ) : null}
                       {orderStatusSteps.map((step) => (
                         <button
                           key={step.value}
                           type="button"
                           className={order.status === step.value ? "is-active" : ""}
                           onClick={() => updateOrderStatus(order._id, step.value)}
-                          disabled={updatingOrderId === order._id || order.status === step.value}
+                          disabled={updatingOrderId === order._id || order.status === step.value || !canUpdateOrderStatus(order)}
                         >
                           {updatingOrderId === order._id && order.status !== step.value ? "Updating..." : step.label}
                         </button>
@@ -960,7 +1108,7 @@ function Dashboard() {
           <section className="vendor-score__products vendor-requests-panel" aria-labelledby="dashboard-messages-title">
             <div className="vendor-profile-panel__header">
               <div>
-                <h2 id="dashboard-messages-title">Vendor mailbox</h2>
+                <h2 id="dashboard-messages-title">Owner mailbox</h2>
                 <p>Read customer messages sent from the public storefront.</p>
               </div>
               <span>{messages.filter((message) => message.requestType === "message").length} messages</span>
@@ -971,7 +1119,7 @@ function Dashboard() {
             {messages.filter((message) => message.requestType === "message").length === 0 ? (
               <div className="dashboard-empty-state">
                 <MessageCircle size={30} aria-hidden="true" />
-                <strong>No vendor messages yet</strong>
+                <strong>No owner messages yet</strong>
                 <p>When customers message this store, their notes will appear here.</p>
               </div>
             ) : (
@@ -1032,7 +1180,7 @@ function Dashboard() {
             </div>
 
             <form className="form-panel vendor-profile-edit" onSubmit={handleSaveProfile} noValidate>
-              <h3>Edit store details</h3>
+              <h3>Edit store profile</h3>
               <div className="field-grid">
                 <label className="field">
                   <span>Owner name</span>
@@ -1067,6 +1215,14 @@ function Dashboard() {
                   <textarea value={profileForm.description} onChange={(event) => updateProfileForm("description", event.target.value)} placeholder="What customers can buy from this store" />
                 </label>
                 <label className="field">
+                  <span>Store logo URL</span>
+                  <input value={profileForm.logoUrl} onChange={(event) => updateProfileForm("logoUrl", event.target.value)} placeholder="https://example.com/logo.jpg" />
+                </label>
+                <label className="field">
+                  <span>Store cover image URL</span>
+                  <input value={profileForm.coverImageUrl} onChange={(event) => updateProfileForm("coverImageUrl", event.target.value)} placeholder="https://example.com/cover.jpg" />
+                </label>
+                <label className="field">
                   <span>Payment method</span>
                   <select value={profileForm.paymentType} onChange={(event) => updateProfileForm("paymentType", event.target.value)}>
                     <option value="upi">UPI or direct digital payment</option>
@@ -1077,6 +1233,25 @@ function Dashboard() {
                   <span>Payment ID optional</span>
                   <input value={profileForm.upiId} onChange={(event) => updateProfileForm("upiId", event.target.value)} placeholder="store@upi or payment note" />
                 </label>
+                <label className="field">
+                  <span>UPI scanner image URL optional</span>
+                  <input value={profileForm.upiQrUrl} onChange={(event) => updateProfileForm("upiQrUrl", event.target.value)} placeholder="https://example.com/upi-qr.jpg" />
+                </label>
+                <label className="field field--full">
+                  <span>QR payment reference</span>
+                  <input
+                    value={profileForm.upiQrReference || getUpiQrReference(profileForm)}
+                    onChange={(event) => updateProfileForm("upiQrReference", event.target.value)}
+                    placeholder="SnaflesHub | Store | Owner | Email"
+                  />
+                </label>
+                {profileForm.upiQrUrl ? (
+                  <div className="field field--full dashboard-upi-preview">
+                    <span>UPI scanner preview</span>
+                    <img src={profileForm.upiQrUrl} alt="UPI scanner preview" />
+                    <small>{profileForm.upiQrReference || getUpiQrReference(profileForm)}</small>
+                  </div>
+                ) : null}
                 <label className="field">
                   <span>Latitude optional</span>
                   <input value={profileForm.lat} onChange={(event) => updateProfileForm("lat", event.target.value)} placeholder="30.7333" />
@@ -1104,6 +1279,46 @@ function Dashboard() {
                 {isProfileSaving ? "Saving..." : "Save store profile"}
               </button>
             </form>
+          </section>
+        ) : null}
+
+        {activeTab === "settings" ? (
+          <section className="vendor-score__products vendor-profile-panel dashboard-settings-panel" aria-labelledby="dashboard-settings-title">
+            <div className="vendor-profile-panel__header">
+              <div>
+                <h2 id="dashboard-settings-title">Settings</h2>
+                <p>Manage account security, verification, and store account details.</p>
+              </div>
+              <span>{store?.storeCode ? `Store ID ${store.storeCode}` : "Account settings"}</span>
+            </div>
+
+            <div className="vendor-profile-list">
+              {settingsRows.map((row) => (
+                <article key={row.label}>
+                  <span>{row.label}</span>
+                  <strong>{row.value}</strong>
+                </article>
+              ))}
+            </div>
+
+            <div className="dashboard-settings-grid">
+              <article className="dashboard-settings-card">
+                <div>
+                  <span>Security</span>
+                  <h3>Password</h3>
+                  <p>Keep the store account protected with a strong password.</p>
+                </div>
+                <Link to="/vendor/login">Reset password</Link>
+              </article>
+              <article className="dashboard-settings-card">
+                <div>
+                  <span>Storefront</span>
+                  <h3>Public page</h3>
+                  <p>Open the customer-facing store page to review how shoppers see this storefront.</p>
+                </div>
+                <Link to={store?._id ? `/store/${store._id}` : "/map"}>View store</Link>
+              </article>
+            </div>
           </section>
         ) : null}
 
@@ -1325,13 +1540,6 @@ function Dashboard() {
                 <ExternalLink size={16} /> Facebook
               </a>
             </div>
-            <section className="share-store-dialog__qr" aria-label="QR code placeholder">
-              <QrCode size={32} />
-              <div>
-                <strong>QR code</strong>
-                <p>Future-ready QR section for printable storefront sharing.</p>
-              </div>
-            </section>
             {shareStatus ? <p className="status-text status-text--success">{shareStatus}</p> : null}
           </div>
           <footer className="share-store-dialog__footer">

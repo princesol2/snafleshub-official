@@ -32,6 +32,7 @@ function AppRoutes() {
       <Route path="/terms-and-conditions" element={<InfoPage pageKey="terms-and-conditions" />} />
       <Route path="/terms-of-use" element={<InfoPage pageKey="terms-of-use" />} />
       <Route path="/privacy-policy" element={<InfoPage pageKey="privacy-policy" />} />
+      <Route path="/refund-payment-policy" element={<InfoPage pageKey="refund-payment-policy" />} />
       <Route path="/vendor-policy" element={<InfoPage pageKey="vendor-policy" />} />
       <Route
         path="/map"

@@ -9,7 +9,7 @@ const paymentSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ["manual", "razorpay_test"],
+      enum: ["manual", "razorpay"],
       default: "manual",
     },
     providerOrderId: {
@@ -29,7 +29,7 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["not_required", "created", "pending", "paid", "failed"],
+      enum: ["not_required", "created", "pending", "submitted", "paid", "failed"],
       default: "created",
     },
     testMode: {

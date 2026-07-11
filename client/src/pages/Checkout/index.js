@@ -14,7 +14,54 @@ import {
   mongoObjectIdPattern,
   saveCart,
 } from "../../utils/storefront";
+import { createDemoOrder, demoOrderId, demoOrderToken, demoProducts, demoStore, isDemoStoreId, saveDemoOrder } from "../../utils/demoStore";
 import "./Checkout.css";
+
+const razorpayCheckoutScript = "https://checkout.razorpay.com/v1/checkout.js";
+const manualUpiPaymentMode = "manual_upi";
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    const existingScript = document.querySelector(`script[src="${razorpayCheckoutScript}"]`);
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(true), { once: true });
+      existingScript.addEventListener("error", () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = razorpayCheckoutScript;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+function getUpiReference(store) {
+  return store?.upiQrReference || `SnaflesHub | ${store?.name || "Store"}`;
+}
+
+function getUpiIntentUrl({ store, amount }) {
+  if (!store?.upiId) {
+    return "";
+  }
+
+  const params = new URLSearchParams({
+    pa: store.upiId,
+    pn: store.name || "SnaflesHub store",
+    am: Number(amount || 0).toFixed(2),
+    cu: "INR",
+    tn: getUpiReference(store),
+  });
+
+  return `upi://pay?${params.toString()}`;
+}
 
 function Checkout() {
   const { storeId } = useParams();
@@ -25,6 +72,7 @@ function Checkout() {
   const [checkoutForm, setCheckoutForm] = useState(initialCheckoutForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [pendingPaymentMessage, setPendingPaymentMessage] = useState("");
   const [error, setError] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
   useDocumentTitle("Checkout");
@@ -33,6 +81,14 @@ function Checkout() {
     let isMounted = true;
 
     const loadCheckout = async () => {
+      if (isDemoStoreId(storeId)) {
+        setStore(demoStore);
+        setProducts(demoProducts);
+        setError("");
+        setIsLoading(false);
+        return;
+      }
+
       if (!mongoObjectIdPattern.test(storeId || "")) {
         setError("This checkout link is not available.");
         setIsLoading(false);
@@ -85,10 +141,13 @@ function Checkout() {
   );
   const cartSubtotal = hydratedCart.reduce((sum, item) => sum + Number(item.product.price || 0) * Number(item.quantity || 0), 0);
   const isOwnStoreCheckout = isVendorStoreOwner(store, getVendor());
+  const canUseManualUpi = Boolean(store?.upiId || store?.upiQrUrl);
+  const upiIntentUrl = getUpiIntentUrl({ store, amount: cartSubtotal });
 
   const updateCheckoutForm = (field, value) => {
     setCheckoutForm((current) => ({ ...current, [field]: value }));
     setCheckoutError("");
+    setPendingPaymentMessage("");
   };
 
   const setCartQuantity = (productId, quantity) => {
@@ -111,7 +170,7 @@ function Checkout() {
     setCheckoutError("");
 
     if (isOwnStoreCheckout) {
-      setCheckoutError("Preview mode: vendors cannot place orders from their own store account.");
+      setCheckoutError("Preview mode: owners cannot place orders from their own storefront account.");
       return;
     }
 
@@ -125,6 +184,18 @@ function Checkout() {
       return;
     }
 
+    if (checkoutForm.paymentMode === manualUpiPaymentMode) {
+      if (!canUseManualUpi) {
+        setCheckoutError("This store has not added UPI payment details yet. Choose cash/manual payment.");
+        return;
+      }
+
+      if (checkoutForm.upiReference.trim().length < 6) {
+        setCheckoutError("Pay the store by UPI, then enter the transaction reference before placing the order.");
+        return;
+      }
+    }
+
     const unavailableItem = hydratedCart.find((item) => Number(item.product.stock || 0) < Number(item.quantity || 1));
 
     if (unavailableItem) {
@@ -134,6 +205,25 @@ function Checkout() {
 
     try {
       setIsCheckingOut(true);
+      setPendingPaymentMessage("");
+
+      if (isDemoStoreId(storeId)) {
+        const demoOrder = createDemoOrder(
+          hydratedCart.map((item) => ({ productId: item.product._id, quantity: item.quantity })),
+          {
+            name: checkoutForm.name,
+            phone: checkoutForm.phone,
+            address: checkoutForm.address,
+          },
+          checkoutForm.paymentMode
+        );
+        saveDemoOrder(demoOrder);
+        setCartItems([]);
+        setCheckoutForm(initialCheckoutForm);
+        navigate(`/store/${storeId}/order-success/${demoOrderId}?token=${encodeURIComponent(demoOrderToken)}`, { replace: true });
+        return;
+      }
+
       const response = await api.post("/api/checkout", {
         storeId,
         items: hydratedCart.map((item) => ({
@@ -145,19 +235,104 @@ function Checkout() {
           phone: checkoutForm.phone,
           address: checkoutForm.address,
         },
-        paymentMode: "cash_on_delivery",
+        paymentMode: checkoutForm.paymentMode,
+        paymentDetails: {
+          upiReference: checkoutForm.upiReference,
+          upiScreenshotUrl: checkoutForm.upiScreenshotUrl,
+        },
         fulfillmentMethod: "store_contact",
       });
       const order = response.data.data?.order;
       const token = response.data.data?.confirmationToken;
 
+      if (response.data.data?.paymentRequired) {
+        const razorpayOptions = response.data.data.razorpay;
+        const isRazorpayReady = await loadRazorpayCheckout();
+
+        if (!isRazorpayReady || !window.Razorpay) {
+          await api.post("/api/checkout/payments/failed", {
+            orderId: order?._id,
+            reason: "checkout_script_failed",
+          });
+          setCheckoutError("Online payment could not load. Please choose cash payment or try again.");
+          return;
+        }
+
+        setPendingPaymentMessage("Complete the secure Razorpay payment window to confirm your order.");
+
+        await new Promise((resolve, reject) => {
+          const checkout = new window.Razorpay({
+            key: razorpayOptions.keyId,
+            amount: razorpayOptions.amount,
+            currency: razorpayOptions.currency,
+            name: razorpayOptions.name,
+            description: razorpayOptions.description,
+            order_id: razorpayOptions.orderId,
+            prefill: razorpayOptions.prefill,
+            theme: {
+              color: "#0f8f98",
+            },
+            handler: async (paymentResponse) => {
+              try {
+                const verificationResponse = await api.post("/api/checkout/payments/verify", {
+                  orderId: order._id,
+                  razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                  razorpay_order_id: paymentResponse.razorpay_order_id,
+                  razorpay_signature: paymentResponse.razorpay_signature,
+                });
+                resolve(verificationResponse.data.data);
+              } catch (verificationError) {
+                reject(verificationError);
+              }
+            },
+            modal: {
+              ondismiss: async () => {
+                try {
+                  await api.post("/api/checkout/payments/failed", {
+                    orderId: order?._id,
+                    reason: "checkout_dismissed",
+                  });
+                } catch (closeError) {
+                  // The next checkout attempt will reconcile with the server state.
+                }
+                reject(new Error("Payment window was closed before payment finished."));
+              },
+            },
+          });
+
+          checkout.on("payment.failed", async (failureResponse) => {
+            try {
+              await api.post("/api/checkout/payments/failed", {
+                orderId: order?._id,
+                reason: failureResponse?.error?.reason || failureResponse?.error?.description || "payment_failed",
+              });
+            } catch (closeError) {
+              // The visible error below is enough for the customer; server errors are logged by the API layer.
+            }
+            reject(new Error(failureResponse?.error?.description || "Payment failed. Please try again."));
+          });
+
+          checkout.open();
+        }).then((verifiedData) => {
+          const verifiedOrder = verifiedData?.order;
+          const verifiedToken = verifiedData?.confirmationToken;
+
+          setCartItems([]);
+          setCheckoutForm(initialCheckoutForm);
+          navigate(`/store/${storeId}/order-success/${verifiedOrder._id}?token=${encodeURIComponent(verifiedToken || "")}`, { replace: true });
+        });
+
+        return;
+      }
+
       setCartItems([]);
       setCheckoutForm(initialCheckoutForm);
       navigate(`/store/${storeId}/order-success/${order._id}?token=${encodeURIComponent(token || "")}`, { replace: true });
     } catch (requestError) {
-      setCheckoutError(requestError.response?.data?.message || "Unable to place this order. Please try again.");
+      setCheckoutError(requestError.response?.data?.message || requestError.message || "Unable to place this order. Please try again.");
     } finally {
       setIsCheckingOut(false);
+      setPendingPaymentMessage("");
     }
   };
 
@@ -188,7 +363,7 @@ function Checkout() {
               <h1>Review your order</h1>
               <p>
                 {isOwnStoreCheckout
-                  ? "This is your vendor preview. Checkout is disabled for your own store."
+                  ? "This is your owner preview. Checkout is disabled for your own storefront."
                   : store?.name
                     ? `Ordering from ${store.name}`
                     : "Review items before placing your order."}
@@ -246,7 +421,7 @@ function Checkout() {
             <div className="checkout-section-header">
               <span>Customer details</span>
               <h2>Place order</h2>
-              <p>Manual cash order only. The store will contact you to confirm delivery or pickup.</p>
+              <p>Choose cash/manual payment or complete secure online payment before the order is confirmed.</p>
             </div>
 
             <label>
@@ -262,10 +437,94 @@ function Checkout() {
               <textarea value={checkoutForm.address} onChange={(event) => updateCheckoutForm("address", event.target.value)} placeholder="House number, street, city" />
             </label>
 
+            <div className="checkout-payment-options" role="radiogroup" aria-label="Payment option">
+              <label className={checkoutForm.paymentMode === "cash_on_delivery" ? "is-selected" : ""}>
+                <input
+                  type="radio"
+                  name="paymentMode"
+                  value="cash_on_delivery"
+                  checked={checkoutForm.paymentMode === "cash_on_delivery"}
+                  onChange={(event) => updateCheckoutForm("paymentMode", event.target.value)}
+                />
+                <span>
+                  <strong>Cash / manual payment</strong>
+                  Pay when the store confirms pickup or delivery.
+                </span>
+              </label>
+              {canUseManualUpi ? (
+                <label className={checkoutForm.paymentMode === manualUpiPaymentMode ? "is-selected" : ""}>
+                  <input
+                    type="radio"
+                    name="paymentMode"
+                    value={manualUpiPaymentMode}
+                    checked={checkoutForm.paymentMode === manualUpiPaymentMode}
+                    onChange={(event) => updateCheckoutForm("paymentMode", event.target.value)}
+                  />
+                  <span>
+                    <strong>Pay directly by UPI</strong>
+                    Send payment to the store, then submit the UPI reference for vendor confirmation.
+                  </span>
+                </label>
+              ) : null}
+              <label className={checkoutForm.paymentMode === "online" ? "is-selected" : ""}>
+                <input
+                  type="radio"
+                  name="paymentMode"
+                  value="online"
+                  checked={checkoutForm.paymentMode === "online"}
+                  onChange={(event) => updateCheckoutForm("paymentMode", event.target.value)}
+                />
+                <span>
+                  <strong>Pay online</strong>
+                  Complete payment securely through Razorpay.
+                </span>
+              </label>
+            </div>
+
             <div className="checkout-payment-note">
               <CreditCard size={17} aria-hidden="true" />
-              Cash on delivery / manual order
+              {checkoutForm.paymentMode === "online"
+                ? "Online payment confirms the order after verification."
+                : checkoutForm.paymentMode === manualUpiPaymentMode
+                  ? "UPI payment is reviewed by the vendor before fulfillment."
+                  : "Cash on delivery / manual order"}
             </div>
+            {checkoutForm.paymentMode === manualUpiPaymentMode ? (
+              <div className="checkout-upi-scanner">
+                <div>
+                  <span>Direct UPI payment</span>
+                  <strong>{store.upiId ? `Pay ${store.upiId}` : `Scan to pay ${store.name}`}</strong>
+                  <p>Pay exactly {formatPrice(cartSubtotal)} and use this note: {getUpiReference(store)}</p>
+                  {upiIntentUrl ? (
+                    <a href={upiIntentUrl} className="checkout-upi-scanner__link">
+                      Open UPI app
+                    </a>
+                  ) : null}
+                </div>
+                {store?.upiQrUrl ? <img src={store.upiQrUrl} alt={`${store.name} UPI scanner`} /> : null}
+              </div>
+            ) : null}
+
+            {checkoutForm.paymentMode === manualUpiPaymentMode ? (
+              <div className="checkout-upi-fields">
+                <label>
+                  <span>UPI transaction/reference ID</span>
+                  <input
+                    value={checkoutForm.upiReference}
+                    onChange={(event) => updateCheckoutForm("upiReference", event.target.value)}
+                    placeholder="Example: UPI Ref No. 412345678901"
+                  />
+                </label>
+                <label>
+                  <span>Screenshot URL optional</span>
+                  <input
+                    value={checkoutForm.upiScreenshotUrl}
+                    onChange={(event) => updateCheckoutForm("upiScreenshotUrl", event.target.value)}
+                    placeholder="Paste payment screenshot link if available"
+                  />
+                </label>
+              </div>
+            ) : null}
 
             <div className="checkout-total">
               <span>Total</span>
@@ -273,9 +532,22 @@ function Checkout() {
             </div>
 
             {checkoutError ? <p className="checkout-error">{checkoutError}</p> : null}
+            {pendingPaymentMessage ? <p className="checkout-pending">{pendingPaymentMessage}</p> : null}
 
             <button type="submit" disabled={isCheckingOut || hydratedCart.length === 0 || isOwnStoreCheckout}>
-              {isOwnStoreCheckout ? "Checkout disabled in preview" : isCheckingOut ? "Placing order..." : "Place order"}
+              {isOwnStoreCheckout
+                ? "Checkout disabled in preview"
+                : isCheckingOut
+                  ? checkoutForm.paymentMode === "online"
+                    ? "Opening secure payment..."
+                    : checkoutForm.paymentMode === manualUpiPaymentMode
+                      ? "Submitting UPI payment..."
+                    : "Placing order..."
+                  : checkoutForm.paymentMode === "online"
+                    ? "Pay online"
+                    : checkoutForm.paymentMode === manualUpiPaymentMode
+                      ? "Submit UPI payment"
+                    : "Place order"}
             </button>
           </form>
         </main>

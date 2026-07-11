@@ -180,6 +180,7 @@ function Home() {
             <Link to="/terms-and-conditions">{t("footer.terms")}</Link>
             <Link to="/terms-of-use">{t("footer.termsUse")}</Link>
             <Link to="/privacy-policy">{t("footer.privacy")}</Link>
+            <Link to="/refund-payment-policy">{t("footer.paymentPolicy")}</Link>
             <Link to="/vendor-policy">{t("footer.vendorPolicy")}</Link>
           </nav>
         </div>

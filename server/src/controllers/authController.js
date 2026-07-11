@@ -66,6 +66,20 @@ const getProductKeywords = (value) => {
   return [...new Set(value.map((product) => String(product).trim()).filter(Boolean))].slice(0, 12);
 };
 
+const getUpiQrReference = ({ ownerName, name, email, workPhone, category, upiQrReference }) => {
+  const providedReference = String(upiQrReference || "").trim();
+
+  if (providedReference) {
+    return providedReference.slice(0, 180);
+  }
+
+  return ["SnaflesHub", name, ownerName, email || workPhone, category]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 180);
+};
+
 const getExistingStoreByName = (name) => {
   const normalizedName = String(name || "").trim();
 
@@ -281,6 +295,8 @@ const registerVendorStore = asyncHandler(async (req, res) => {
     coverImageUrl,
     workingHours,
     upiId,
+    upiQrUrl,
+    upiQrReference,
     paymentType = "upi",
     paypalEmail,
     planId = "free",
@@ -332,14 +348,14 @@ const registerVendorStore = asyncHandler(async (req, res) => {
     );
   }
 
-  if (paymentType === "upi" && !upiId) {
+  if (paymentType === "upi" && !upiId && !upiQrUrl) {
     return sendAuthError(
       res,
       400,
       "MISSING_PAYMENT_DETAILS",
       "Payment details are required",
-      "Please add the payment ID, payment link, or direct payment note customers should use.",
-      [{ field: "upiId", message: "Payment details are required for UPI payments." }]
+      "Please add the UPI ID, payment link, or UPI scanner customers should use.",
+      [{ field: "upiId", message: "UPI ID or scanner is required for UPI payments." }]
     );
   }
 
@@ -435,6 +451,8 @@ const registerVendorStore = asyncHandler(async (req, res) => {
     coverImageUrl,
     workingHours,
     upiId,
+    upiQrUrl,
+    upiQrReference: getUpiQrReference({ ownerName, name, email: normalizedEmail, workPhone, category, upiQrReference }),
     paymentType,
     paypalEmail,
     socialLinks: {

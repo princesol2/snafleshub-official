@@ -71,7 +71,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMode: {
       type: String,
-      enum: ["pay_at_store", "cash_on_delivery", "test_online"],
+      enum: ["pay_at_store", "cash_on_delivery", "manual_upi", "online", "test_online"],
       default: "cash_on_delivery",
     },
     subtotal: {
@@ -86,7 +86,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["created", "payment_pending", "confirmed", "preparing", "completed", "cancelled"],
+      enum: ["created", "payment_pending", "payment_submitted", "payment_failed", "confirmed", "preparing", "completed", "cancelled"],
       default: "created",
     },
     paymentId: {

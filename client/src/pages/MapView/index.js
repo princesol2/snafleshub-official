@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { LocateFixed, Map as MapIcon, MapPin, Satellite, Search, X } from "lucide-react";
+import { LocateFixed, Map as MapIcon, Satellite, Search, Store, X } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import api from "../../services/api";
@@ -13,7 +13,8 @@ import {
   getStoreLink,
   getStoreLocationLabel,
 } from "../../utils/storeDisplay";
-import { MapLoadingOverlay, ProductPreviewSkeleton } from "../../components/LoadingSkeleton";
+import { demoStore } from "../../utils/demoStore";
+import { MapLoadingOverlay } from "../../components/LoadingSkeleton";
 import "./MapView.css";
 
 const mapModes = {
@@ -39,6 +40,21 @@ const mapTileSources = {
 const mapAttribution =
   '<a href="https://maplibre.org/" target="_blank" rel="noreferrer">MapLibre</a> | © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a> | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors | Tiles © Esri';
 const defaultCenter = [76.7794, 30.7333];
+const mapZoomLimits = {
+  min: 4,
+  max: 18.5,
+};
+const mapInteractionTuning = {
+  trackpadZoomRate: 1 / 160,
+  wheelZoomRate: 1 / 900,
+  touchZoomRate: 0.72,
+  touchZoomThreshold: 0.18,
+  dragPan: {
+    linearity: 0.26,
+    maxSpeed: 1200,
+    deceleration: 2600,
+  },
+};
 const storeRefreshIntervalMs = 15000;
 
 function createMapStyle(mode) {
@@ -97,30 +113,28 @@ function getStoreCoordinates(store) {
   return null;
 }
 
-function getCoordinateGroupKey(coordinates) {
-  return coordinates.map((coordinate) => coordinate.toFixed(4)).join(":");
-}
+function getStoresWithDemo(stores, query = "") {
+  const hasDemoStore = stores.some((store) => getStoreId(store) === getStoreId(demoStore));
 
-function getClusterOffset(clusterIndex) {
-  if (clusterIndex === 0) {
-    return { x: 0, y: 0 };
+  if (hasDemoStore) {
+    return stores;
   }
 
-  const pinsPerRing = 8;
-  const zeroBasedIndex = clusterIndex - 1;
-  const ring = Math.floor(zeroBasedIndex / pinsPerRing);
-  const positionInRing = zeroBasedIndex % pinsPerRing;
-  const radius = 50 + ring * 24;
-  const angle = positionInRing * ((Math.PI * 2) / pinsPerRing);
-
-  return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-  };
+  return [demoStore, ...stores];
 }
 
 function getFitPadding(map) {
   const { clientWidth, clientHeight } = map.getContainer();
+
+  if (clientWidth < 761) {
+    return {
+      top: 188,
+      right: 56,
+      bottom: 190,
+      left: 56,
+    };
+  }
+
   const basePadding = Math.max(24, Math.min(80, Math.round(Math.min(clientWidth, clientHeight) * 0.12)));
   const rightPadding = clientWidth >= 900 ? Math.min(360, Math.round(clientWidth * 0.26)) : basePadding;
   const horizontalPadding = basePadding + rightPadding;
@@ -172,125 +186,26 @@ function fitMapToStores(map, stores) {
   });
 }
 
-function getStoreProducts(store) {
-  if (store?.productsPreview?.length) {
-    return store.productsPreview;
-  }
-
-  if (store?.products?.length) {
-    return store.products;
-  }
-
-  if (store?.productKeywords?.length) {
-    return store.productKeywords.map((name) => ({ name }));
-  }
-
-  return [];
-}
-
-function getStoreStatusLabel(store, t) {
-  const hours = String(store?.workingHours || "").trim();
-
-  if (!hours) {
-    return t("map.hoursNotListed");
-  }
-
-  if (/closed|close/i.test(hours)) {
-    return hours;
-  }
-
-  return `${t("map.hoursListed")} · ${hours}`;
-}
-
-function ProductPreview({ products, isLoading, store, storeIndex }) {
+function StorePreviewCard({ store, index, onClose }) {
   const { t } = useLanguage();
-
-  if (isLoading) {
-    return <ProductPreviewSkeleton />;
-  }
-
-  if (!products?.length) {
-    return <p className="custom-store-card__empty">{t("map.productsEmpty")}</p>;
-  }
+  const storeImage = store.logoUrl || store.coverImageUrl;
+  const locationLabel = store.address || getStoreLocationLabel(store);
 
   return (
-    <div className="custom-store-card__products">
-      {products.slice(0, 3).map((product, index) => (
-        <article key={product._id || `${product.name}-${index}`}>
-          <span>{product.name}</span>
-          {product.price !== undefined ? <strong>{`${t("store.productPrice")}: ${product.price}`}</strong> : null}
-          <Link to={`${getStoreLink(store, storeIndex)}#products`}>
-            Pull in
-          </Link>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function StoreHoverCard({ store, index, products, isLoadingProducts, onClose }) {
-  const { t } = useLanguage();
-  const coverImage = store.coverImageUrl;
-  const logoImage = store.logoUrl;
-
-  return (
-    <article className="custom-store-card">
-      <button type="button" className="custom-store-card__close" onClick={onClose} aria-label={t("map.closeStoreCard")}>
+    <article className="custom-store-preview">
+      <button type="button" className="custom-store-preview__close" onClick={onClose} aria-label={t("map.closeStoreCard")}>
         <X size={16} aria-hidden="true" />
       </button>
-      <div className="custom-store-card__cover">
-        {coverImage ? <img src={coverImage} alt="" /> : null}
-        <div className="custom-store-card__avatar">
-          {logoImage ? <img src={logoImage} alt="" /> : <span>{getStoreInitials(store)}</span>}
-        </div>
+      <div className="custom-store-preview__image" aria-hidden="true">
+        {storeImage ? <img src={storeImage} alt="" /> : <Store size={22} aria-hidden="true" />}
       </div>
-      <div className="custom-store-card__body">
-        <div className="custom-store-card__meta">
+      <div className="custom-store-preview__body">
+        <div className="custom-store-preview__meta">
           <span>{store.category || t("map.localShop")}</span>
-          <span>{getStoreStatusLabel(store, t)}</span>
         </div>
         <h2>{store.name}</h2>
-        <span className="custom-store-card__store-id">Store ID: {getStoreCode(store)}</span>
-        <p>{store.description || t("map.defaultDescription")}</p>
-        <div className="custom-store-card__details">
-          <div>
-            <strong>{t("map.address")}</strong>
-            <span>
-              <MapPin size={14} aria-hidden="true" />
-              {store.address || getStoreLocationLabel(store)}
-            </span>
-          </div>
-          {store.workingHours ? (
-            <div>
-              <strong>{t("map.openStatus")}</strong>
-              <span>{getStoreStatusLabel(store, t)}</span>
-            </div>
-          ) : null}
-          {store.ownerName ? (
-            <div>
-              <strong>{t("map.owner")}</strong>
-              <span>{store.ownerName}</span>
-            </div>
-          ) : null}
-          {store.email ? (
-            <div>
-              <strong>{t("map.email")}</strong>
-              <span>{store.email}</span>
-            </div>
-          ) : null}
-          <div>
-            <strong>{t("map.location")}</strong>
-            <span>{getStoreLocationLabel(store)}</span>
-          </div>
-        </div>
-        <h3>{store.productMatchCount ? t("map.matchingProducts") : t("map.products")}</h3>
-        <ProductPreview
-          products={products || getStoreProducts(store)}
-          isLoading={isLoadingProducts}
-          store={store}
-          storeIndex={index}
-        />
-        <Link to={getStoreLink(store, index)}>{t("map.viewProducts")}</Link>
+        <p>{locationLabel}</p>
+        <Link className="custom-store-preview__action" to={getStoreLink(store, index)}>{t("map.viewProducts")}</Link>
       </div>
     </article>
   );
@@ -347,8 +262,6 @@ function MapView() {
   const [error, setError] = useState("");
   const [mapNotice, setMapNotice] = useState("");
   const [activeStoreId, setActiveStoreId] = useState("");
-  const [productsByStore, setProductsByStore] = useState({});
-  const [loadingProductsByStore, setLoadingProductsByStore] = useState({});
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapMode, setMapMode] = useState(mapModes.street);
   const [projectedStores, setProjectedStores] = useState([]);
@@ -363,9 +276,12 @@ function MapView() {
       style: createMapStyle(mapModes.street),
       center: defaultCenter,
       zoom: 12.2,
-      minZoom: 3,
-      maxZoom: 19,
+      minZoom: mapZoomLimits.min,
+      maxZoom: mapZoomLimits.max,
       attributionControl: false,
+      scrollZoom: true,
+      dragPan: mapInteractionTuning.dragPan,
+      touchZoomRotate: true,
     });
 
     map.addControl(
@@ -382,6 +298,10 @@ function MapView() {
     );
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
+    map.scrollZoom.setZoomRate(mapInteractionTuning.trackpadZoomRate);
+    map.scrollZoom.setWheelZoomRate(mapInteractionTuning.wheelZoomRate);
+    map.touchZoomRotate.setZoomRate(mapInteractionTuning.touchZoomRate);
+    map.touchZoomRotate.setZoomThreshold(mapInteractionTuning.touchZoomThreshold);
     mapRef.current = map;
     const markMapReady = () => {
       map.resize();
@@ -391,7 +311,7 @@ function MapView() {
     map.once("styledata", markMapReady);
     map.once("load", markMapReady);
     map.once("error", () => {
-      setMapNotice("Map tiles are temporarily unavailable. Store pins are still available.");
+      setMapNotice("Map tiles are temporarily unavailable. Store markers are still available.");
     });
 
     return () => {
@@ -431,9 +351,6 @@ function MapView() {
           setIsLoading(true);
         }
         setError("");
-        if (!silent) {
-          setProductsByStore({});
-        }
         const response = await api.get("/api/stores", {
           params: searchTerm ? { search: searchTerm } : {},
         });
@@ -442,7 +359,7 @@ function MapView() {
           return;
         }
 
-        setStores(response.data.data || []);
+        setStores(getStoresWithDemo(response.data.data || [], searchTerm));
         if (!silent) {
           setActiveStoreId("");
         }
@@ -451,11 +368,13 @@ function MapView() {
           return;
         }
 
+        const demoFallbackStores = [demoStore];
+
         if (!silent) {
-          setStores([]);
+          setStores(demoFallbackStores);
           setActiveStoreId("");
         }
-        setError(requestError.response?.data?.message || t("map.unavailable"));
+        setError("");
       } finally {
         if (isMounted && !silent) {
           setIsLoading(false);
@@ -499,21 +418,22 @@ function MapView() {
 
     const updateProjectedStores = () => {
       const { clientWidth, clientHeight } = map.getContainer();
-      const clusteredPins = new Map();
+      const isCompact = clientWidth < 761;
+      const markerSafeInset = isCompact ? 30 : 26;
+      const topSafeInset = isCompact ? 190 : 146;
+      const bottomSafeInset = isCompact ? 178 : 72;
+      const minY = Math.min(topSafeInset, Math.max(markerSafeInset, clientHeight - markerSafeInset));
+      const maxY = Math.max(minY, clientHeight - bottomSafeInset);
+      const maxX = Math.max(clientWidth - markerSafeInset, markerSafeInset);
 
       setProjectedStores(
         mapStores.map((store) => {
           const point = map.project(store.coordinates);
-          const clusterKey = getCoordinateGroupKey(store.coordinates);
-          const clusterIndex = clusteredPins.get(clusterKey) || 0;
-          const offset = getClusterOffset(clusterIndex);
-          clusteredPins.set(clusterKey, clusterIndex + 1);
-          const x = clamp(point.x + offset.x, 28, Math.max(clientWidth - 28, 28));
-          const y = clamp(point.y + offset.y, 28, Math.max(clientHeight - 28, 28));
-          const isCompact = clientWidth < 761;
-          const hasRoomRight = x < clientWidth - 390;
-          const hasRoomLeft = x > 390;
-          const hasRoomBelow = y < clientHeight - 420;
+          const x = clamp(point.x, markerSafeInset, maxX);
+          const y = clamp(point.y, minY, maxY);
+          const hasRoomRight = x < clientWidth - 340;
+          const hasRoomLeft = x > 340;
+          const hasRoomBelow = y < clientHeight - 230;
           const placement = isCompact
             ? "bottom-sheet"
             : hasRoomRight
@@ -526,7 +446,6 @@ function MapView() {
 
           return {
             ...store,
-            clusterIndex,
             placement,
             screenPosition: {
               x,
@@ -566,26 +485,8 @@ function MapView() {
     fitMapToStores(map, mapStores);
   }, [isMapReady, mapStores, query]);
 
-  const loadProducts = async (store) => {
-    if (!store || productsByStore[store.mapId] || loadingProductsByStore[store.mapId]) {
-      return;
-    }
-
-    setLoadingProductsByStore((current) => ({ ...current, [store.mapId]: true }));
-
-    try {
-      const response = await api.get(`/api/stores/${store._id}/products`);
-      setProductsByStore((current) => ({ ...current, [store.mapId]: response.data.data || [] }));
-    } catch (requestError) {
-      setProductsByStore((current) => ({ ...current, [store.mapId]: [] }));
-    } finally {
-      setLoadingProductsByStore((current) => ({ ...current, [store.mapId]: false }));
-    }
-  };
-
   const activateStore = (store) => {
     setActiveStoreId(store.mapId);
-    loadProducts(store);
 
     if (mapRef.current && isMapReady) {
       mapRef.current.easeTo({
@@ -594,6 +495,20 @@ function MapView() {
         duration: 650,
         essential: true,
       });
+    }
+  };
+
+  const handleMapSurfacePointerDown = (event) => {
+    if (!activeStoreId) {
+      return;
+    }
+
+    const ignoredTarget = event.target.closest(
+      ".custom-store-preview, .custom-map-marker, .custom-map__results, .custom-map__insight, .maplibregl-ctrl"
+    );
+
+    if (!ignoredTarget) {
+      setActiveStoreId("");
     }
   };
 
@@ -666,7 +581,7 @@ function MapView() {
       {mapNotice ? <p className="custom-map__notice custom-map__notice--map">{mapNotice}</p> : null}
 
       <section className="custom-map">
-        <div className="custom-map__surface">
+        <div className="custom-map__surface" onPointerDownCapture={handleMapSurfacePointerDown}>
           <div ref={mapContainerRef} className="custom-map__canvas" aria-label={t("map.interactiveMap")} />
           {isLoading || !isMapReady ? <MapLoadingOverlay /> : null}
 
@@ -690,7 +605,7 @@ function MapView() {
               <button
                 key={store.mapId}
                 type="button"
-                className={`custom-map-pin ${activeStoreId === store.mapId ? "is-active" : ""}`}
+                className={`custom-map-marker ${activeStoreId === store.mapId ? "is-active" : ""}`}
                 style={{ left: `${store.screenPosition.x}px`, top: `${store.screenPosition.y}px` }}
                 onClick={() => activateStore(store)}
                 onKeyDown={(event) => {
@@ -701,7 +616,7 @@ function MapView() {
                 }}
                 aria-label={`${t("map.openStoreCard")} ${store.name}`}
               >
-                <span>{getStoreInitials(store)}</span>
+                <Store size={17} strokeWidth={2.25} aria-hidden="true" />
               </button>
             ))
           ) : !isLoading && !error ? (
@@ -728,11 +643,9 @@ function MapView() {
                 top: `${activeProjectedStore.screenPosition.y}px`,
               }}
             >
-              <StoreHoverCard
+              <StorePreviewCard
                 store={activeProjectedStore}
                 index={activeProjectedStore.mapIndex}
-                products={productsByStore[activeProjectedStore.mapId]}
-                isLoadingProducts={loadingProductsByStore[activeProjectedStore.mapId]}
                 onClose={() => setActiveStoreId("")}
               />
             </div>

@@ -20,6 +20,8 @@ export const defaultWizardValues = {
   email: "",
   password: "",
   upiId: "",
+  upiQrUrl: "",
+  upiQrReference: "",
   paypalEmail: "",
   paymentType: "cash",
 };

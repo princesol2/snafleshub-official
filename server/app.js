@@ -11,6 +11,8 @@ const errorHandler = require("./src/middleware/errorHandler");
 
 const app = express();
 
+app.disable("x-powered-by");
+
 const allowedOrigins = (process.env.CORS_ORIGIN || process.env.CLIENT_URL || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -18,6 +20,10 @@ const allowedOrigins = (process.env.CORS_ORIGIN || process.env.CLIENT_URL || "")
 
 if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   throw new Error("CORS_ORIGIN is required in production");
+}
+
+if (process.env.TRUST_PROXY === "true") {
+  app.set("trust proxy", 1);
 }
 
 app.use((req, res, next) => {

@@ -5,6 +5,8 @@ export const initialCheckoutForm = {
   phone: "",
   address: "",
   paymentMode: "cash_on_delivery",
+  upiReference: "",
+  upiScreenshotUrl: "",
 };
 
 export function getProductInitials(name) {

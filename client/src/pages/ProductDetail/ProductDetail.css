@@ -5,12 +5,12 @@
 
 .product-flow-back {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   gap: 8px;
   margin-bottom: 18px;
   color: var(--color-blue-deep);
-  font-weight: 900;
+  font-weight: 950;
   text-decoration: none;
 }
 
@@ -151,24 +151,25 @@
 
 .product-detail-quantity button {
   display: inline-flex;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(11, 68, 77, 0.14);
-  border-radius: 9px;
+  border-radius: 11px;
   background: #ffffff;
   color: var(--color-blue-deep);
   cursor: pointer;
+  font-weight: 950;
 }
 
 .product-detail-quantity input {
-  width: 58px;
-  height: 36px;
+  width: 64px;
+  height: 44px;
   border: 0;
   background: transparent;
   color: var(--color-ink);
-  font-weight: 900;
+  font-weight: 950;
   text-align: center;
 }
 

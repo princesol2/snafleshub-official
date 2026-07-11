@@ -51,6 +51,13 @@ export function normalizeApiError(error, fallback = fallbackError) {
     };
   }
 
+  if ([502, 503, 504].includes(status)) {
+    return {
+      title: "Service temporarily unavailable",
+      message: "The API server is not reachable right now. Please restart the server and try again.",
+    };
+  }
+
   if (status >= 500 || hasTechnicalLanguage(responseMessage)) {
     return {
       title: "We could not save your changes",
@@ -63,4 +70,3 @@ export function normalizeApiError(error, fallback = fallbackError) {
     message: responseMessage || fallback.message,
   };
 }
-

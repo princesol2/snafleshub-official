@@ -12,13 +12,13 @@ import "./CreateStore.css";
 
 const categoryOptions = ["Grocery", "Food", "Fashion", "Electronics", "Handcrafts", "Drawings", "Paintings", "Art", "Services", "Other"];
 
-const stepLabels = ["Welcome", "Vendor", "Store", "Location", "Media", "Contact", "Review", "Done"];
+const stepLabels = ["Welcome", "Owner", "Storefront", "Location", "Media", "Contact", "Review", "Done"];
 
 const initialTouched = {};
 
 const createStoreFallbackError = {
   title: "We could not create your store",
-  message: "Please check your store details and try again.",
+  message: "Please check your store details and try again. If this keeps happening, the API server may need to be restarted.",
 };
 
 function getStepAlert(message) {
@@ -65,6 +65,13 @@ function getPublicStoreUrl(store) {
 
 function getDisplayStoreId(store) {
   return store?.storeCode || store?._id || "";
+}
+
+function getUpiQrReference(values) {
+  return ["SnaflesHub", values.name, values.ownerName, values.email || values.workPhone, values.category]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ");
 }
 
 function CreateStore() {
@@ -118,7 +125,7 @@ function CreateStore() {
     }
 
     if (name === "category" && !values.category.trim()) {
-      return "Choose a seller category.";
+      return "Choose a storefront category.";
     }
 
     if (name === "name" && !values.name.trim()) {
@@ -314,7 +321,7 @@ function CreateStore() {
       const response = await api.post("/api/auth/register-store", {
         ownerName: values.ownerName.trim(),
         name: values.name.trim(),
-        email: "",
+        email: values.email.trim(),
         workPhone: values.workPhone.trim(),
         password: values.password,
         address: [values.landmark.trim(), values.address.trim()].filter(Boolean).join(", "),
@@ -324,9 +331,11 @@ function CreateStore() {
         logoUrl: "",
         coverImageUrl: "",
         workingHours: "",
-        upiId: "",
+        upiId: values.upiId.trim(),
+        upiQrUrl: values.upiQrUrl.trim(),
+        upiQrReference: (values.upiQrReference || getUpiQrReference(values)).trim(),
         paypalEmail: "",
-        paymentType: "cash",
+        paymentType: values.upiId.trim() || values.upiQrUrl.trim() ? "upi" : "cash",
         location:
           values.showOnMap && hasValidCoordinates(values)
             ? {
@@ -390,7 +399,7 @@ function CreateStore() {
             {currentStep === 1 ? (
               <section className="store-step">
                 <div className="store-step__header">
-                  <h1>About vendor</h1>
+                  <h1>About owner</h1>
                   <p>Start with the person customers and SnaflesHub can contact.</p>
                 </div>
                 <label className="field">
@@ -399,7 +408,7 @@ function CreateStore() {
                   <small>{touched.ownerName ? getFieldError("ownerName") : "Use the name customers or support should recognize."}</small>
                 </label>
                 <label className="field">
-                  <span>Seller category</span>
+                  <span>Storefront category</span>
                   <select name="category" value={values.category} onChange={updateField} onBlur={() => markTouched(["category"])}>
                     <option value="">Choose category</option>
                     {categoryOptions.map((category) => (
@@ -408,7 +417,7 @@ function CreateStore() {
                       </option>
                     ))}
                   </select>
-                  <small>{touched.category ? getFieldError("category") : "This helps customers understand what you sell."}</small>
+                  <small>{touched.category ? getFieldError("category") : "This helps customers understand the storefront."}</small>
                 </label>
               </section>
             ) : null}
@@ -480,6 +489,28 @@ function CreateStore() {
                   <strong>{values.coverFileName || "Choose cover image"}</strong>
                   <input type="file" name="coverFileName" accept="image/*" onChange={handleMediaChange} />
                 </label>
+                <label className="field">
+                  <span>UPI scanner image URL optional</span>
+                  <input name="upiQrUrl" value={values.upiQrUrl} onChange={updateField} placeholder="https://example.com/upi-qr.jpg" />
+                  <small>Add your UPI QR scanner now, or add it later from the dashboard.</small>
+                </label>
+                <label className="field">
+                  <span>QR payment reference</span>
+                  <input
+                    name="upiQrReference"
+                    value={values.upiQrReference || getUpiQrReference(values)}
+                    onChange={updateField}
+                    placeholder="SnaflesHub | Store | Owner | Email"
+                  />
+                  <small>Use this identity text with your UPI scanner so it matches your storefront and owner details.</small>
+                </label>
+                {values.upiQrUrl ? (
+                  <div className="store-upi-preview">
+                    <span>UPI scanner preview</span>
+                    <img src={values.upiQrUrl} alt="UPI scanner preview" />
+                    <small>{values.upiQrReference || getUpiQrReference(values)}</small>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -495,9 +526,19 @@ function CreateStore() {
                   <small>{touched.workPhone ? getFieldError("workPhone") : "Use a number customers and login safeguards can reach."}</small>
                 </label>
                 <label className="field">
+                  <span>Email optional</span>
+                  <input type="email" name="email" value={values.email} onChange={updateField} placeholder="owner@example.com" />
+                  <small>This helps match payment and storefront identity.</small>
+                </label>
+                <label className="field">
                   <span>Password</span>
                   <input type="password" name="password" value={values.password} onChange={updateField} onBlur={() => markTouched(["password"])} />
                   <small>{touched.password ? getFieldError("password") : "Use this password with your generated Store ID."}</small>
+                </label>
+                <label className="field">
+                  <span>UPI ID optional</span>
+                  <input name="upiId" value={values.upiId} onChange={updateField} placeholder="store@upi" />
+                  <small>This can be used with your QR scanner for manual customer payments.</small>
                 </label>
               </section>
             ) : null}
@@ -514,7 +555,10 @@ function CreateStore() {
                   <article><span>Category</span><strong>{values.category}</strong></article>
                   <article><span>Location</span><strong>{[values.landmark, values.address].filter(Boolean).join(", ")}</strong></article>
                   <article><span>Phone</span><strong>{values.workPhone}</strong></article>
+                  <article><span>Email</span><strong>{values.email || "Not added"}</strong></article>
                   <article><span>Media status</span><strong>{values.logoFileName || values.coverFileName ? "Media added" : "Skipped for now"}</strong></article>
+                  <article><span>UPI scanner</span><strong>{values.upiQrUrl ? "Added" : "Not added yet"}</strong></article>
+                  <article><span>QR reference</span><strong>{values.upiQrReference || getUpiQrReference(values)}</strong></article>
                 </div>
               </section>
             ) : null}

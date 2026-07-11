@@ -74,6 +74,16 @@ const storeSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    upiQrUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    upiQrReference: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     paymentType: {
       type: String,
       trim: true,

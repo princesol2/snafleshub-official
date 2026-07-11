@@ -5,6 +5,7 @@ import api from "../../services/api";
 import useDocumentTitle from "../../utils/useDocumentTitle";
 import { getVendor } from "../../services/session";
 import { addProductToCart, formatPrice, getProductInitials, isVendorStoreOwner, mongoObjectIdPattern } from "../../utils/storefront";
+import { demoStore, getDemoProduct, isDemoStoreId } from "../../utils/demoStore";
 import "./ProductDetail.css";
 
 function ProductDetail() {
@@ -22,6 +23,21 @@ function ProductDetail() {
     let isMounted = true;
 
     const loadProduct = async () => {
+      if (isDemoStoreId(storeId)) {
+        const demoProduct = getDemoProduct(productId);
+
+        if (!demoProduct) {
+          setError("This product link is not available.");
+        } else {
+          setStore(demoStore);
+          setProduct(demoProduct);
+          setError("");
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
       if (!mongoObjectIdPattern.test(storeId || "") || !mongoObjectIdPattern.test(productId || "")) {
         setError("This product link is not available.");
         setIsLoading(false);
@@ -68,7 +84,7 @@ function ProductDetail() {
 
   const handleAddToCart = (goToCheckout = false) => {
     if (isOwnStorePreview) {
-      setNotice("Preview mode: vendors cannot place orders from their own store account.");
+      setNotice("Preview mode: owners cannot place orders from their own storefront account.");
       return;
     }
 
@@ -137,7 +153,7 @@ function ProductDetail() {
 
             {isOwnStorePreview ? (
               <p className="product-detail-notice">
-                You are previewing your own product. Customer checkout is disabled while using this vendor account.
+                You are previewing your own product. Customer checkout is disabled while using this owner account.
               </p>
             ) : null}
 
@@ -166,7 +182,7 @@ function ProductDetail() {
                 {isOwnStorePreview ? "Preview only" : "Add to cart"}
               </button>
               <button type="button" onClick={() => handleAddToCart(true)} disabled={isUnavailable || isOwnStorePreview}>
-                {isOwnStorePreview ? "Checkout disabled" : "Pull in"}
+                {isOwnStorePreview ? "Checkout disabled" : "Buy now"}
               </button>
             </div>
           </section>

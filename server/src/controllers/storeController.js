@@ -43,6 +43,20 @@ const getSocialLinks = (value) => ({
   linkedin: String(value?.linkedin || "").trim().slice(0, 220),
 });
 
+const getUpiQrReference = ({ ownerName, name, email, workPhone, category, upiQrReference }) => {
+  const providedReference = String(upiQrReference || "").trim();
+
+  if (providedReference) {
+    return providedReference.slice(0, 180);
+  }
+
+  return ["SnaflesHub", name, ownerName, email || workPhone, category]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ")
+    .slice(0, 180);
+};
+
 const normalizeComparable = (value) => String(value || "").trim();
 
 const getExistingStoreByName = (name) => {
@@ -103,6 +117,8 @@ const createStore = asyncHandler(async (req, res) => {
     coverImageUrl,
     workingHours,
     upiId,
+    upiQrUrl,
+    upiQrReference,
     paymentType,
     paypalEmail,
     planId = "free",
@@ -159,6 +175,8 @@ const createStore = asyncHandler(async (req, res) => {
     coverImageUrl,
     workingHours,
     upiId,
+    upiQrUrl,
+    upiQrReference: getUpiQrReference({ ownerName, name, email, workPhone, category, upiQrReference }),
     paymentType,
     paypalEmail,
     socialLinks: getSocialLinks(socialLinks),
@@ -288,6 +306,7 @@ const updateStore = asyncHandler(async (req, res) => {
     "coverImageUrl",
     "workingHours",
     "upiId",
+    "upiQrUrl",
     "paymentType",
     "paypalEmail",
   ];
@@ -304,6 +323,17 @@ const updateStore = asyncHandler(async (req, res) => {
 
   if (req.body.socialLinks !== undefined) {
     store.socialLinks = getSocialLinks(req.body.socialLinks);
+  }
+
+  if (req.body.upiQrReference !== undefined) {
+    store.upiQrReference = getUpiQrReference({
+      ownerName: req.body.ownerName !== undefined ? req.body.ownerName : store.ownerName,
+      name: req.body.name !== undefined ? req.body.name : store.name,
+      email: req.body.email !== undefined ? req.body.email : store.email,
+      workPhone: req.body.workPhone !== undefined ? req.body.workPhone : store.workPhone,
+      category: req.body.category !== undefined ? req.body.category : store.category,
+      upiQrReference: req.body.upiQrReference,
+    });
   }
 
   if (req.body.location !== undefined) {

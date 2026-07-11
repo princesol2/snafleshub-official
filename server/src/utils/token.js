@@ -39,6 +39,11 @@ const verifyToken = (token) => {
   }
 
   const [payload, signature] = token.split(".");
+
+  if (!payload || !signature) {
+    return null;
+  }
+
   const expectedSignature = sign(payload);
 
   if (
@@ -48,7 +53,13 @@ const verifyToken = (token) => {
     return null;
   }
 
-  const data = base64UrlDecode(payload);
+  let data;
+
+  try {
+    data = base64UrlDecode(payload);
+  } catch (error) {
+    return null;
+  }
 
   if (!data.exp || Date.now() > data.exp) {
     return null;

@@ -108,10 +108,13 @@ function LandingNavbar() {
   return (
     <header className={`landing-navbar ${isScrolled ? "is-scrolled" : ""}`}>
       <div className="landing-navbar__inner">
-        <Link to="/" className="landing-navbar__brand" onClick={handleBrandClick}>
-          <BrandMark />
-          <span>SnaflesHub</span>
-        </Link>
+        <div className="landing-navbar__brand-wrap">
+          <Link to="/" className="landing-navbar__brand" onClick={handleBrandClick}>
+            <BrandMark />
+            <span>SnaflesHub</span>
+          </Link>
+          <span className="landing-navbar__tagline">{t("nav.tagline")}</span>
+        </div>
 
         <div className={`landing-navbar__panel ${isMenuOpen ? "is-open" : ""}`}>
           <nav className="landing-navbar__links" aria-label="Landing page">

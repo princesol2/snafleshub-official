@@ -13,7 +13,8 @@ client/dist/
 *.out.log
 *.err.log
 
-# Local browser/debug profiles and QA screenshots
+# Local runtime data, browser/debug profiles, QA screenshots, and archived outputs
+.local/
 .local-mongo/
 audit-report/
 deploy/
@@ -34,3 +35,4 @@ storefront-*.png
 create-store-*.png
 snafleshub-visual-walkthrough.png
 how-it-works-*.png
+dashboard-*.png

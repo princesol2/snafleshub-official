@@ -19,11 +19,18 @@
   gap: var(--space-8);
 }
 
+.landing-navbar__brand-wrap {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .landing-navbar__brand {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  flex-shrink: 0;
   color: var(--color-heading);
   font-family: var(--font-display);
   font-size: 18px;
@@ -35,6 +42,14 @@
   height: 32px;
   flex: 0 0 auto;
   color: var(--color-primary);
+}
+
+.landing-navbar__tagline {
+  margin-left: 44px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .landing-navbar__panel {
@@ -232,5 +247,10 @@
 
   .landing-navbar__language-compact {
     display: none;
+  }
+
+  .landing-navbar__tagline {
+    margin-left: 42px;
+    font-size: 11px;
   }
 }

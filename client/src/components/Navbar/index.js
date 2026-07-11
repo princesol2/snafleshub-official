@@ -30,7 +30,7 @@ function Navbar() {
   const store = getStore();
   const isAuthenticated = Boolean(authToken && vendor?._id);
   const activeNavItems = isAuthenticated ? vendorNavItems : navItems;
-  const profileLabel = store?.name || vendor?.ownerName || "Vendor";
+  const profileLabel = store?.name || vendor?.ownerName || "Owner";
   const brandTarget = isAuthenticated ? "/vendor/dashboard" : "/";
 
   const closeMenu = () => {
@@ -68,7 +68,7 @@ function Navbar() {
             <BrandMark />
             <span>SnaflesHub</span>
           </Link>
-          <span className="navbar__tagline">{isAuthenticated ? "Vendor workspace" : t("nav.tagline")}</span>
+          <span className="navbar__tagline">{isAuthenticated ? "Owner workspace" : t("nav.tagline")}</span>
         </div>
 
         <nav className={`navbar__links ${isMenuOpen ? "is-open" : ""}`} aria-label="Primary">
@@ -106,7 +106,7 @@ function Navbar() {
         <div className="navbar__actions">
           {isAuthenticated ? (
             <>
-              <Link to="/vendor/dashboard" className="navbar__profile" title="Vendor profile">
+              <Link to="/vendor/dashboard" className="navbar__profile" title="Owner profile">
                 <UserCircle size={18} />
                 <span>{profileLabel}</span>
               </Link>

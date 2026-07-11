@@ -309,7 +309,8 @@
   }
 
   .navbar__tagline {
-    display: none;
+    margin-left: 42px;
+    font-size: 11px;
   }
 
   .navbar__brand .brand-mark {

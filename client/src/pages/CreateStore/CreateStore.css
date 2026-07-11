@@ -217,6 +217,40 @@
   cursor: pointer;
 }
 
+.store-upi-preview {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.store-upi-preview span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.store-upi-preview img {
+  width: min(180px, 100%);
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line-soft);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.store-upi-preview small {
+  color: var(--color-body);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 .store-review-list {
   display: grid;
   gap: var(--space-3);

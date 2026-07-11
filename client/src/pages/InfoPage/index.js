@@ -19,14 +19,14 @@ const pages = {
       },
       {
         title: "Who it is for",
-        copy: "Independent stores, market stalls, services, makers, and sellers who need a clean digital presence customers can discover and trust.",
+        copy: "Independent stores, market stalls, services, makers, and creators who need a clean digital presence customers can discover and trust.",
       },
       {
         title: "Why map-first",
         copy: "Shopping starts with intent: where is it, what do they sell, and can I reach them directly? SnaflesHub keeps those answers close to the map.",
       },
     ],
-    actions: [{ label: "Explore stores", to: "/map", variant: "primary" }],
+    actions: [{ label: "Explore storefronts", to: "/map", variant: "primary" }],
   },
   support: {
     title: "Support",
@@ -84,6 +84,38 @@ const pages = {
     ],
     actions: [],
   },
+  "refund-payment-policy": {
+    title: "Refund and Payment Policy",
+    eyebrow: "Payments",
+    lead: "This policy explains how SnaflesHub handles customer payments, store order responsibility, failed payments, and refund support.",
+    sections: [
+      {
+        title: "Payment collection",
+        copy: "SnaflesHub may support online payments for eligible storefront orders. Payment availability can vary by store, product, and launch configuration.",
+      },
+      {
+        title: "Order fulfilment",
+        copy: "Stores are responsible for product availability, order preparation, handover, delivery arrangements, and customer communication after an order is placed.",
+      },
+      {
+        title: "Failed or cancelled payments",
+        copy: "If an online payment fails or is cancelled before confirmation, the order should not be treated as paid. SnaflesHub keeps the order and payment status separate so stores can verify payment state before fulfilment.",
+      },
+      {
+        title: "Refund requests",
+        copy: "Refund requests should be raised with SnaflesHub support and the storefront. Include the order ID, store name, payment method, and a clear reason so the payment status can be reviewed.",
+      },
+      {
+        title: "Refund timing",
+        copy: "Approved refunds depend on the payment provider, bank, and store review. SnaflesHub will share the available status when support has enough order and payment details.",
+      },
+      {
+        title: "Cash or pay-at-store orders",
+        copy: "For cash, pay-at-store, or direct store payment orders, customers and stores should resolve payment adjustments directly unless SnaflesHub support is needed for order records.",
+      },
+    ],
+    actions: [{ label: "Contact support", to: "/support", variant: "primary" }],
+  },
   "vendor-policy": {
     title: "Storefront Policy",
     eyebrow: "Storefront policy",
@@ -115,7 +147,7 @@ const aboutStorySections = [
   {
     title: "Where we are going",
     copy:
-      "The goal is to build a storefront network where local stores, makers, service providers, and creative sellers can be found by what they offer. Search should lead to real stores, useful products, and direct connection.",
+      "The goal is to build a storefront network where stores, makers, service providers, and creative creators can be found by what they offer. Search should lead to real stores, useful products, and direct connection.",
     image: handmadeGiftImage,
     imageAlt: "Handmade products packaged for customers",
   },
@@ -134,7 +166,7 @@ function AboutPage() {
           </p>
           <div className="info-page__actions">
             <Link to="/map" className="button">
-              Explore stores
+              Explore storefronts
             </Link>
             <Link to="/support" className="button--ghost">
               Contact support
@@ -162,8 +194,8 @@ function AboutPage() {
           </p>
           <p>
             That thought became the heart of SnaflesHub: a storefront system for people who have skill, products, and
-            ambition, but do not yet have the tools to be seen. This platform is built for stores, makers, and local
-            sellers who deserve a fair chance to reach customers.
+            ambition, but do not yet have the tools to be seen. This platform is built for stores, makers, and creators
+            who deserve a fair chance to reach customers.
           </p>
         </blockquote>
       </section>
