@@ -6,6 +6,7 @@ const authRoutes = require("./src/routes/authRoutes");
 const storeRoutes = require("./src/routes/storeRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const checkoutRoutes = require("./src/routes/checkoutRoutes");
+const cafeStudyRoutes = require("./src/routes/cafeStudyRoutes");
 const notFound = require("./src/middleware/notFound");
 const errorHandler = require("./src/middleware/errorHandler");
 
@@ -55,6 +56,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/checkout", checkoutRoutes);
+app.use("/api/cafe-study", cafeStudyRoutes);
 
 if (process.env.SERVE_CLIENT_DIST === "true") {
   const clientDistPath = path.resolve(__dirname, "../client/dist");

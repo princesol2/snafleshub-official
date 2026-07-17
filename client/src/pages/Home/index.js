@@ -86,7 +86,12 @@ function Home() {
                 <span>{t("home.exploreStores")}</span>
                 <ArrowRight size={18} aria-hidden="true" />
               </Link>
+              <Link className="home-button home-button--survey" to="/cafe-study">
+                <span>Take Part in Survey</span>
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
             </div>
+            <p className="home-survey-note">For cafe owners: help shape our local visibility pilot.</p>
           </div>
         </div>
       </section>

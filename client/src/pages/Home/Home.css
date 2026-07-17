@@ -131,6 +131,22 @@
   backdrop-filter: blur(12px);
 }
 
+.home-button--survey {
+  border-color: rgba(188, 244, 248, 0.44);
+  background: rgba(188, 244, 248, 0.12);
+  color: #ffffff;
+  backdrop-filter: blur(12px);
+}
+
+.home-survey-note {
+  max-width: 520px;
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
 .home-mission {
   border-bottom: 1px solid rgba(17, 24, 39, 0.08);
   background: #ffffff;
@@ -506,6 +522,7 @@
   .home-hero .home-eyebrow,
   .home-hero h1,
   .home-hero__subtitle,
+  .home-survey-note,
   .home-hero .home-actions {
     width: 100%;
     max-width: calc(100vw - 32px);

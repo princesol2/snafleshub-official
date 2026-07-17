@@ -10,6 +10,7 @@ import ProductDetail from "../pages/ProductDetail";
 import Checkout from "../pages/Checkout";
 import OrderSuccess from "../pages/OrderSuccess";
 import InfoPage from "../pages/InfoPage";
+import CafeStudy from "../pages/CafeStudy";
 import NotFound from "../pages/NotFound";
 import { RouteSkeleton } from "../components/LoadingSkeleton";
 
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/store/:storeId/product/:productId" element={<ProductDetail />} />
       <Route path="/store/:storeId/checkout" element={<Checkout />} />
       <Route path="/store/:storeId/order-success/:orderId" element={<OrderSuccess />} />
+      <Route path="/cafe-study" element={<CafeStudy />} />
       <Route path="/about" element={<InfoPage pageKey="about" />} />
       <Route path="/support" element={<InfoPage pageKey="support" />} />
       <Route path="/terms-and-conditions" element={<InfoPage pageKey="terms-and-conditions" />} />
