@@ -179,8 +179,18 @@ function Checkout() {
       return;
     }
 
-    if (!checkoutForm.name.trim() || !isValidPhone(checkoutForm.phone) || checkoutForm.address.trim().length < 8) {
-      setCheckoutError("Enter a valid name, mobile number, and delivery address.");
+    if (!checkoutForm.name.trim()) {
+      setCheckoutError("Enter the customer name.");
+      return;
+    }
+
+    if (!isValidPhone(checkoutForm.phone)) {
+      setCheckoutError("Enter a valid mobile number with 10 to 15 digits.");
+      return;
+    }
+
+    if (checkoutForm.address.trim().length < 8) {
+      setCheckoutError("Enter a delivery address with at least 8 characters.");
       return;
     }
 

@@ -113,8 +113,16 @@ const createCheckout = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: "Store and at least one product are required" });
   }
 
-  if (!customer.name || !isValidPhone(customer.phone) || !String(customer.address || "").trim()) {
-    return res.status(400).json({ success: false, message: "Enter a valid customer name, phone number, and delivery address" });
+  if (!String(customer.name || "").trim()) {
+    return res.status(400).json({ success: false, message: "Enter the customer name." });
+  }
+
+  if (!isValidPhone(customer.phone)) {
+    return res.status(400).json({ success: false, message: "Enter a valid mobile number with 10 to 15 digits." });
+  }
+
+  if (String(customer.address || "").trim().length < 8) {
+    return res.status(400).json({ success: false, message: "Enter a delivery address with at least 8 characters." });
   }
 
   if (!["cash_on_delivery", "pay_at_store", manualUpiPaymentMode, onlinePaymentMode].includes(paymentMode)) {
