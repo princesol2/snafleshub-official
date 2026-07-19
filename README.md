@@ -100,6 +100,7 @@ npm run seed
 Customer:
 
 - `/`
+- `/cafe-study`
 - `/map`
 - `/store/:id`
 - `/store/:storeId/product/:productId`
@@ -127,3 +128,4 @@ Info:
 - `.env`, logs, local Mongo data, audit reports, recordings, build output, and dependency folders are intentionally ignored.
 - Vendor self-checkout is blocked in both frontend and backend to prevent fake sales from a store owner account.
 - Stores appear on the map only when they have valid map coordinates.
+- Production deployment uses the root `npm start` command, which runs `startup.js` and serves the built frontend when `SERVE_CLIENT_DIST=true`.
